@@ -1,0 +1,1943 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>InspectGlobal v5 — Infrastructure Intelligence Platform</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#05080F;--bg2:#0A1220;--bg3:#0D1B2E;--bg4:#112240;--bg5:#163066;
+  --teal:#00B4CC;--mint:#00D68F;--gold:#F0A500;--red:#E53E3E;--orange:#F6891F;
+  --purple:#8B5CF6;--sky:#38BDF8;--green:#22C55E;--pink:#EC4899;
+  --dgray:#5A7A94;--text:#B8D0E4;--white:#F0F6FF;
+  --sat-color:#00D68F;--gps-color:#F6891F;--iot-color:#38BDF8;
+  --drone-color:#E53E3E;--cam-color:#06B6D4;--edge-color:#F59E0B;
+  --acou-color:#A78BFA;--phys-color:#22C55E;
+  --solar:#F59E0B;--wind:#38BDF8;--mining:#B45309;--rail:#22C55E;
+  --road:#94A3B8;--port:#06B6D4;--dam:#3B82F6;--power:#EF4444;--tx:#8B5CF6;
+  --indpark:#00B4CC;
+}
+*{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',system-ui,sans-serif}
+body{background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+
+/* ═══ LOGIN ═══ */
+#login-screen{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px}
+#login-screen.hidden{display:none}
+.login-logo{font-size:32px;font-weight:900;color:var(--white);margin-bottom:6px;letter-spacing:-1px}
+.login-logo span{color:var(--teal)}
+.login-tagline{font-size:13px;color:var(--dgray);margin-bottom:40px;text-align:center}
+.login-subtitle{font-size:12px;font-weight:700;color:var(--dgray);text-transform:uppercase;letter-spacing:2px;margin-bottom:20px}
+.role-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;max-width:860px;width:100%}
+.role-card{background:var(--bg3);border:1px solid var(--bg4);border-radius:14px;padding:20px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden}
+.role-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:14px 14px 0 0;transition:all .2s}
+.role-card:hover{transform:translateY(-3px);border-color:var(--teal)}
+.role-card:hover::before{opacity:1}
+.role-card .role-icon{font-size:32px;margin-bottom:10px}
+.role-card .role-name{font-size:15px;font-weight:800;color:var(--white);margin-bottom:4px}
+.role-card .role-desc{font-size:11px;color:var(--dgray);line-height:1.5;margin-bottom:10px}
+.role-card .role-access{font-size:10px;color:var(--teal);display:flex;flex-wrap:wrap;gap:4px}
+.role-access-tag{background:var(--bg4);border-radius:4px;padding:2px 6px;color:var(--text)}
+.login-footer{margin-top:24px;font-size:10px;color:var(--dgray);text-align:center}
+
+/* ═══ NAV ═══ */
+nav{background:var(--bg2);border-bottom:1px solid var(--bg4);display:flex;align-items:center;padding:0 14px;height:50px;position:sticky;top:0;z-index:1000;gap:2px}
+.nav-logo{font-size:17px;font-weight:900;color:var(--white);letter-spacing:-0.5px;margin-right:10px;white-space:nowrap;display:flex;align-items:center;gap:6px}
+.nav-logo .logo-text{color:var(--teal)}
+.nav-version{background:var(--bg4);color:var(--teal);font-size:9px;padding:2px 6px;border-radius:3px;font-weight:700}
+.nav-btn{background:transparent;border:none;color:var(--dgray);padding:5px 9px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:600;transition:all .15s;display:flex;align-items:center;gap:4px;white-space:nowrap}
+.nav-btn:hover{background:var(--bg3);color:var(--white)}
+.nav-btn.active{background:rgba(0,180,204,0.15);color:var(--teal);border:1px solid rgba(0,180,204,0.3)}
+.nav-btn.locked{opacity:.35;cursor:not-allowed}
+.nav-sep{width:1px;height:20px;background:var(--bg4);margin:0 4px;flex-shrink:0}
+.nav-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.user-pill{background:var(--bg3);border:1px solid var(--bg4);border-radius:20px;padding:4px 12px;font-size:11px;display:flex;align-items:center;gap:6px;cursor:pointer}
+.user-dot{width:7px;height:7px;border-radius:50%}
+.live-pill{background:rgba(0,214,143,0.08);border:1px solid rgba(0,214,143,0.25);border-radius:20px;padding:4px 10px;font-size:10px;color:var(--mint);display:flex;align-items:center;gap:5px}
+.pulse-dot{width:6px;height:6px;border-radius:50%;background:var(--mint);animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(1.4)}}
+
+/* ═══ LAYOUT ═══ */
+.portal{display:none;padding:14px;min-height:calc(100vh - 50px);animation:fadeIn .2s ease}
+.portal.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+
+/* ═══ STATS ROW ═══ */
+.stats-row{display:grid;gap:10px;margin-bottom:14px}
+.stat{background:var(--bg2);border:1px solid var(--bg4);border-radius:8px;padding:13px 15px;position:relative;overflow:hidden}
+.stat::after{content:'';position:absolute;top:0;left:0;width:3px;height:100%}
+.stat.c-teal::after{background:var(--teal)}.stat.c-gold::after{background:var(--gold)}.stat.c-red::after{background:var(--red)}
+.stat.c-orange::after{background:var(--orange)}.stat.c-purple::after{background:var(--purple)}.stat.c-sky::after{background:var(--sky)}
+.stat.c-green::after{background:var(--green)}.stat.c-pink::after{background:var(--pink)}
+.stat-val{font-size:24px;font-weight:800;color:var(--white);line-height:1}
+.stat-label{font-size:10px;color:var(--dgray);margin-top:3px}
+.stat-sub{font-size:10px;margin-top:3px}.up{color:var(--mint)}.down{color:var(--red)}.warn{color:var(--gold)}
+
+/* ═══ CARDS ═══ */
+.card{background:var(--bg2);border:1px solid var(--bg4);border-radius:10px;padding:13px}
+.card-title{font-size:11px;font-weight:700;color:var(--dgray);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.card-title .ct-icon{font-size:14px}
+
+/* ═══ PROJECT CARDS ═══ */
+.proj-card{background:var(--bg2);border:1px solid var(--bg4);border-radius:10px;padding:13px;cursor:pointer;transition:all .18s;position:relative;overflow:hidden}
+.proj-card:hover{border-color:var(--teal);transform:translateY(-1px)}
+.proj-card.alert-crit{border-left:3px solid var(--red)}.proj-card.alert-warn{border-left:3px solid var(--gold)}.proj-card.alert-ok{border-left:3px solid var(--mint)}
+.pc-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:7px}
+.pc-name{font-size:13px;font-weight:700;color:var(--white)}
+.pc-sub{font-size:10px;color:var(--dgray);margin-top:2px}
+.type-chip{font-size:9px;font-weight:700;padding:2px 7px;border-radius:6px;text-transform:uppercase;letter-spacing:.4px}
+.progress-wrap{display:flex;align-items:center;gap:7px;margin:7px 0}
+.pbar{flex:1;height:4px;background:var(--bg4);border-radius:2px;overflow:hidden}
+.pfill{height:100%;border-radius:2px}
+.pval{font-size:11px;font-weight:700;color:var(--white);min-width:28px;text-align:right}
+.pc-metrics{display:flex;gap:10px;margin-top:7px}
+.pcm{text-align:center}
+.pcm-val{font-size:13px;font-weight:700;color:var(--white)}
+.pcm-label{font-size:9px;color:var(--dgray)}
+
+/* ═══ TYPE TABS ═══ */
+.type-tabs{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px}
+.type-tab{background:var(--bg2);border:1px solid var(--bg4);color:var(--dgray);padding:4px 11px;border-radius:12px;font-size:10px;font-weight:600;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:4px}
+.type-tab:hover,.type-tab.active{color:var(--white)}
+.tdot{width:6px;height:6px;border-radius:50%}
+
+/* ═══ INNER TABS ═══ */
+.inner-tabs{display:flex;gap:0;background:var(--bg3);border-radius:7px;padding:2px;width:fit-content;margin-bottom:12px}
+.inner-tab{background:transparent;border:none;color:var(--dgray);padding:5px 13px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:600;transition:all .15s}
+.inner-tab.active{background:var(--teal);color:var(--white)}
+
+/* ═══ GRIDS ═══ */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:11px}
+.section-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.section-title{font-size:13px;font-weight:700;color:var(--white);display:flex;align-items:center;gap:6px}
+
+/* ═══ TABLES ═══ */
+.dtable{width:100%;border-collapse:collapse}
+.dtable th{background:rgba(17,34,64,.8);color:var(--dgray);font-size:10px;text-transform:uppercase;letter-spacing:.5px;padding:8px 10px;text-align:left;border-bottom:1px solid var(--bg4)}
+.dtable td{padding:8px 10px;font-size:11px;border-bottom:1px solid rgba(17,34,64,.5);color:var(--text)}
+.dtable tr:hover td{background:rgba(13,27,46,.6)}
+.dtable tr:last-child td{border:none}
+
+/* ═══ BADGES ═══ */
+.badge{font-size:9px;font-weight:700;padding:2px 7px;border-radius:6px;display:inline-block;text-transform:uppercase;letter-spacing:.3px}
+.badge-released{background:rgba(0,214,143,.1);color:var(--mint);border:1px solid rgba(0,214,143,.25)}
+.badge-pending{background:rgba(240,165,0,.1);color:var(--gold);border:1px solid rgba(240,165,0,.25)}
+.badge-locked{background:rgba(90,122,148,.1);color:var(--dgray);border:1px solid var(--bg4)}
+.badge-blocked{background:rgba(229,62,62,.1);color:var(--red);border:1px solid rgba(229,62,62,.25)}
+.badge-active{background:rgba(0,214,143,.1);color:var(--mint)}
+.badge-crit{background:rgba(229,62,62,.12);color:var(--red)}
+.badge-type{font-size:9px;font-weight:700;padding:2px 7px;border-radius:5px}
+
+/* ═══ ALERTS ═══ */
+.alert-item{display:flex;gap:9px;padding:9px;border-radius:7px;margin-bottom:5px;background:var(--bg3)}
+.alert-item.crit{border-left:3px solid var(--red);background:rgba(229,62,62,.06)}
+.alert-item.warn{border-left:3px solid var(--gold);background:rgba(240,165,0,.05)}
+.alert-item.info{border-left:3px solid var(--sky)}
+.ai-icon{font-size:15px;flex-shrink:0;margin-top:1px}
+.a-title{font-size:11px;font-weight:600;color:var(--white)}
+.a-detail{font-size:10px;color:var(--dgray);margin-top:1px}
+.a-time{font-size:9px;color:var(--teal);margin-top:2px}
+
+/* ═══ BTN ═══ */
+.btn{background:var(--bg3);border:1px solid var(--bg4);color:var(--text);padding:5px 12px;border-radius:6px;font-size:11px;cursor:pointer;transition:all .15s}
+.btn:hover{background:var(--bg4);color:var(--white)}
+.btn-primary{background:var(--teal);border:1px solid var(--teal);color:var(--white);padding:6px 14px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer}
+.btn-sat{background:rgba(0,214,143,.1);border:1px solid rgba(0,214,143,.3);color:var(--mint);padding:5px 12px;border-radius:6px;font-size:11px;cursor:pointer}
+
+/* ═══ MAP ═══ */
+.map-wrap{background:var(--bg3);border-radius:8px;overflow:hidden;border:1px solid var(--bg4)}
+.leaflet-container{background:#0A1220!important}
+.leaflet-popup-content-wrapper{background:var(--bg3);border:1px solid var(--teal);color:var(--text);border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,.6)}
+.leaflet-popup-tip{background:var(--bg3)}
+.leaflet-popup-content{margin:10px 12px;font-size:11px}
+
+/* ═══ SATELLITE ANALYSIS PORTAL ═══ */
+.sat-canvas-wrap{background:var(--bg);border-radius:8px;overflow:hidden;position:relative;border:1px solid var(--bg4)}
+.sat-canvas-wrap canvas{display:block;width:100%;image-rendering:pixelated}
+.sat-overlay{position:absolute;top:8px;left:8px;background:rgba(5,8,15,.85);border:1px solid var(--bg4);border-radius:6px;padding:7px 10px;font-size:10px}
+.sat-overlay-title{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--teal);margin-bottom:4px}
+.ndvi-legend{display:flex;gap:0;height:8px;border-radius:3px;overflow:hidden;width:140px;margin-top:4px}
+.ndvi-label-row{display:flex;justify-content:space-between;font-size:8px;color:var(--dgray);margin-top:2px;width:140px}
+
+/* SAR satellite scan line animation */
+.scan-line{position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,rgba(0,214,143,.6),transparent);animation:scanLine 4s linear infinite;pointer-events:none}
+@keyframes scanLine{from{top:0}to{top:100%}}
+
+/* Before/After split */
+.split-view{position:relative;border-radius:8px;overflow:hidden;cursor:col-resize;user-select:none;border:1px solid var(--bg4)}
+.split-before,.split-after{position:absolute;top:0;height:100%}
+.split-before{left:0}
+.split-after{right:0}
+.split-handle{position:absolute;top:0;bottom:0;width:3px;background:var(--white);cursor:col-resize;z-index:10;display:flex;align-items:center;justify-content:center}
+.split-handle::after{content:'◀▶';font-size:10px;color:var(--bg);background:var(--white);border-radius:10px;padding:4px 6px;white-space:nowrap;position:absolute}
+.split-label{position:absolute;bottom:8px;font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;pointer-events:none}
+
+/* Detection box overlay */
+.detect-box{position:absolute;border:2px solid;border-radius:2px;pointer-events:none}
+.detect-label{position:absolute;top:-18px;left:0;font-size:8px;font-weight:700;padding:1px 4px;border-radius:2px;white-space:nowrap}
+
+/* Corridor progress (railways/roads) */
+.corridor-track{position:relative;height:60px;background:var(--bg4);border-radius:6px;overflow:hidden;margin:10px 0}
+.corridor-segment{height:100%;position:absolute;top:0;transition:opacity .2s;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:rgba(255,255,255,.7)}
+.corridor-machine{position:absolute;top:50%;transform:translate(-50%,-50%);font-size:14px;z-index:10;filter:drop-shadow(0 0 4px rgba(0,214,143,.8));animation:machPulse 2s infinite}
+@keyframes machPulse{0%,100%{filter:drop-shadow(0 0 4px rgba(0,214,143,.8))}50%{filter:drop-shadow(0 0 10px rgba(0,214,143,1))}}
+.corridor-km{display:flex;justify-content:space-between;font-size:9px;color:var(--dgray);margin-top:3px}
+
+/* NDVI grid for deforestation */
+.ndvi-grid{display:grid;gap:1px;border-radius:6px;overflow:hidden}
+.ndvi-cell{aspect-ratio:1;border-radius:0}
+
+/* Source cards (fusion) */
+.source-card{background:var(--bg2);border:1px solid var(--bg4);border-radius:10px;padding:12px;position:relative;overflow:hidden}
+.source-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:2px 2px 0 0}
+.sc-sat::before{background:var(--sat-color)}.sc-gps::before{background:var(--gps-color)}.sc-iot::before{background:var(--iot-color)}
+.sc-drone::before{background:var(--drone-color)}.sc-cam::before{background:var(--cam-color)}.sc-edge::before{background:var(--edge-color)}
+.sc-acou::before{background:var(--acou-color)}.sc-phys::before{background:var(--phys-color)}.sc-bim::before{background:var(--purple)}
+.sc-hdr{display:flex;align-items:center;gap:6px;margin-bottom:7px}
+.sc-icon{font-size:17px}
+.sc-name{font-size:11px;font-weight:700;color:var(--white)}
+.sc-score-row{display:flex;align-items:center;gap:7px;margin-bottom:5px}
+.sc-bar{flex:1;height:5px;background:var(--bg4);border-radius:2px;overflow:hidden}
+.sc-fill{height:100%;border-radius:2px}
+.sc-num{font-size:13px;font-weight:800;min-width:28px;color:var(--white)}
+.sc-status{font-size:9px;font-weight:700;padding:2px 6px;border-radius:6px;display:inline-block}
+.sc-status.live{background:rgba(0,214,143,.1);color:var(--mint);border:1px solid rgba(0,214,143,.25)}
+.sc-status.warn{background:rgba(240,165,0,.1);color:var(--gold);border:1px solid rgba(240,165,0,.25)}
+.sc-status.stale{background:rgba(90,122,148,.1);color:var(--dgray);border:1px solid var(--bg4)}
+.sc-finding{font-size:10px;color:var(--dgray);line-height:1.4;margin-top:4px}
+.sc-update{font-size:9px;color:var(--teal);margin-top:3px}
+
+/* GPS MACHINE LIST */
+.gps-layout{display:grid;grid-template-columns:270px 1fr 290px;gap:12px;height:calc(100vh-140px)}
+.machine-list{background:var(--bg2);border:1px solid var(--bg4);border-radius:10px;overflow-y:auto;max-height:calc(100vh - 180px)}
+.mlist-hdr{padding:10px 12px;border-bottom:1px solid var(--bg4);font-size:11px;font-weight:700;color:var(--white)}
+.machine-row{padding:8px 12px;border-bottom:1px solid rgba(17,34,64,.5);cursor:pointer;transition:background .12s;display:flex;align-items:center;gap:7px}
+.machine-row:hover,.machine-row.sel{background:var(--bg3)}
+.m-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.m-dot.active{background:var(--mint);box-shadow:0 0 5px var(--mint);animation:pulse 2s infinite}
+.m-dot.idle{background:var(--gold)}
+.m-dot.alert{background:var(--red);animation:pulse 1s infinite}
+.m-dot.offline{background:#2a3a4a}
+.m-info{flex:1;min-width:0}
+.m-name{font-size:11px;font-weight:600;color:var(--white);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.m-meta{font-size:9px;color:var(--dgray)}
+.m-spd{font-size:10px;color:var(--mint);font-weight:700;flex-shrink:0}
+
+/* Machine detail panel */
+.mdetail{background:var(--bg2);border:1px solid var(--bg4);border-radius:10px;overflow-y:auto;max-height:calc(100vh - 180px)}
+.md-hdr{padding:11px 12px;border-bottom:1px solid var(--bg4)}
+.md-name{font-size:13px;font-weight:800;color:var(--white)}
+.md-sub{font-size:10px;color:var(--dgray)}
+.md-sec{padding:10px 12px;border-bottom:1px solid rgba(17,34,64,.5)}
+.md-sec-title{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--dgray);margin-bottom:6px}
+.kv{display:flex;justify-content:space-between;margin-bottom:4px}
+.kv-k{font-size:10px;color:var(--dgray)}.kv-v{font-size:10px;font-weight:600;color:var(--white)}
+.kv-v.mint{color:var(--mint)}.kv-v.gold{color:var(--gold)}.kv-v.red{color:var(--red)}
+.activity-bar{display:flex;height:7px;border-radius:4px;overflow:hidden;gap:1px;margin:6px 0}
+.act-seg{height:100%;border-radius:1px}
+.ml-box{background:var(--bg3);border-radius:6px;padding:8px;margin-top:6px}
+.ml-curr{font-size:13px;font-weight:700;color:var(--white)}
+.ml-conf{font-size:10px;color:var(--mint);margin-top:1px}
+.ml-pattern{font-size:9px;color:var(--dgray);margin-top:3px;line-height:1.4}
+
+/* SAT detection overlay canvas */
+.canvas-container{position:relative;border-radius:8px;overflow:hidden}
+.det-overlay{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}
+
+/* IOT / SENSORS */
+.sensor-row{display:flex;align-items:center;gap:9px;padding:8px;background:var(--bg3);border-radius:7px;margin-bottom:5px}
+.sensor-icon{font-size:16px;flex-shrink:0}
+.sensor-info{flex:1}
+.sensor-name{font-size:11px;font-weight:600;color:var(--white)}
+.sensor-val{font-size:11px;color:var(--mint);font-weight:700}
+.sensor-status{font-size:9px;color:var(--dgray)}
+.sensor-alert{color:var(--red)}
+
+/* EDGE / DRONE */
+.edge-card{background:var(--bg2);border:1px solid var(--bg4);border-radius:9px;padding:11px;position:relative;overflow:hidden}
+.edge-led{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.edge-led.on{background:var(--mint);box-shadow:0 0 5px var(--mint)}
+.edge-led.proc{background:var(--gold);animation:pulse 1s infinite}
+.edge-led.off{background:#2a3a4a}
+.drone-row{background:var(--bg3);border-radius:7px;padding:9px 11px;margin-bottom:5px;display:flex;align-items:center;gap:9px}
+
+/* KV UTIL */
+.kv-row{display:flex;justify-content:space-between;margin-bottom:4px}
+.kv-key{font-size:10px;color:var(--dgray)}.kv-val{font-size:10px;font-weight:600;color:var(--white)}
+.kv-val.mint{color:var(--mint)}.kv-val.gold{color:var(--gold)}.kv-val.red{color:var(--red)}.kv-val.orange{color:var(--orange)}
+
+/* FEED */
+.feed-row{display:flex;gap:7px;padding:7px;border-bottom:1px solid rgba(17,34,64,.5)}
+.feed-time{font-size:9px;color:var(--teal);min-width:36px;flex-shrink:0;margin-top:1px}
+.feed-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0;margin-top:4px}
+.feed-msg{font-size:10px;color:var(--text);line-height:1.4}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:var(--bg2)}
+::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:2px}
+
+/* CERT */
+.cert-row{background:var(--bg3);border-radius:7px;padding:9px 11px;margin-bottom:5px;display:flex;align-items:center;gap:9px}
+.cert-id{font-size:11px;font-weight:700;color:var(--mint)}
+.cert-name{font-size:10px;color:var(--white)}
+.cert-hash{font-size:9px;color:var(--dgray);font-family:monospace}
+
+/* MOBILE */
+@media(max-width:1100px){.gps-layout{grid-template-columns:1fr 1fr;grid-template-rows:auto auto}.g3{grid-template-columns:1fr 1fr}.g4{grid-template-columns:1fr 1fr}}
+@media(max-width:760px){.g2,.g3,.g4{grid-template-columns:1fr}.role-grid{grid-template-columns:1fr 1fr}.stats-row{grid-template-columns:1fr 1fr}}
+
+/* Resource Intel */
+.resource-legend{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.rl-item{display:flex;align-items:center;gap:4px;font-size:9px;color:var(--dgray)}
+.rl-dot{width:8px;height:8px;border-radius:2px}
+
+/* Timeline slider */
+.timeline-slider{width:100%;margin:10px 0;appearance:none;height:3px;background:var(--bg4);border-radius:2px;outline:none;cursor:pointer}
+.timeline-slider::-webkit-slider-thumb{appearance:none;width:14px;height:14px;border-radius:50%;background:var(--teal);cursor:pointer}
+.timeline-labels{display:flex;justify-content:space-between;font-size:9px;color:var(--dgray)}
+
+/* Modal overlay */
+#proj-modal{position:fixed;inset:0;background:rgba(5,8,15,.85);z-index:5000;display:none;align-items:center;justify-content:center}
+#proj-modal.open{display:flex}
+.modal-box{background:var(--bg2);border:1px solid var(--bg4);border-radius:14px;width:860px;max-width:96vw;max-height:88vh;overflow-y:auto;padding:24px}
+.modal-close{position:absolute;top:14px;right:14px;background:var(--bg3);border:none;color:var(--white);width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:14px}
+</style>
+</head>
+<body>
+
+<!-- ═══════════ LOGIN SCREEN ═══════════ -->
+<div id="login-screen">
+  <div style="text-align:center;margin-bottom:4px"><span style="font-size:24px">🛰️</span></div>
+  <div class="login-logo">Inspect<span class="logo-text">Global</span></div>
+  <div class="login-tagline">Satellite · GPS · AI · IoT · Fusion Intelligence<br>Select your role to access the platform</div>
+  <div class="login-subtitle">Who are you?</div>
+  <div class="role-grid">
+    <div class="role-card" onclick="login('gov')" style="border-color:rgba(0,214,143,.2)">
+      <div class="role-card::before" style="background:var(--mint)"></div>
+      <div class="role-icon">🏛️</div>
+      <div class="role-name">Government Officer</div>
+      <div class="role-desc">Monitor all national infrastructure projects. View satellite evidence, GPS fleets, environmental compliance, and deforestation alerts.</div>
+      <div class="role-access"><span class="role-access-tag">Overview</span><span class="role-access-tag">Satellite</span><span class="role-access-tag">GPS</span><span class="role-access-tag">Fusion</span><span class="role-access-tag">Resources</span></div>
+    </div>
+    <div class="role-card" onclick="login('dfi')" style="border-color:rgba(56,189,248,.2)">
+      <div class="role-icon">🏦</div>
+      <div class="role-name">DFI Loan Analyst</div>
+      <div class="role-desc">Verify tranche conditions via satellite evidence. Monitor loan portfolio. Issue blockchain certificates for loan milestone releases.</div>
+      <div class="role-access"><span class="role-access-tag">DFI Finance</span><span class="role-access-tag">Satellite</span><span class="role-access-tag">Fusion</span><span class="role-access-tag">Certs</span></div>
+    </div>
+    <div class="role-card" onclick="login('inv')" style="border-color:rgba(240,165,0,.2)">
+      <div class="role-icon">📈</div>
+      <div class="role-name">Investor</div>
+      <div class="role-desc">Track investment portfolio performance. View AI-scored project progress, risk assessments, and projected returns across all asset types.</div>
+      <div class="role-access"><span class="role-access-tag">Investments</span><span class="role-access-tag">Satellite</span><span class="role-access-tag">Risk</span></div>
+    </div>
+    <div class="role-card" onclick="login('field')" style="border-color:rgba(246,137,31,.2)">
+      <div class="role-icon">🔧</div>
+      <div class="role-name">Field Inspector</div>
+      <div class="role-desc">GPS fleet tracking, IoT sensor monitoring, drone mission management, edge AI device oversight. On-site data aggregation and reporting.</div>
+      <div class="role-access"><span class="role-access-tag">GPS Tracking</span><span class="role-access-tag">IoT/Edge</span><span class="role-access-tag">Drones</span><span class="role-access-tag">Cameras</span></div>
+    </div>
+    <div class="role-card" onclick="login('ins')" style="border-color:rgba(229,62,62,.2)">
+      <div class="role-icon">🛡️</div>
+      <div class="role-name">Insurance Underwriter</div>
+      <div class="role-desc">Satellite-verified risk assessment for active claims. Access InSAR deformation data, GPS anomaly reports, and environmental compliance records.</div>
+      <div class="role-access"><span class="role-access-tag">Risk</span><span class="role-access-tag">Claims</span><span class="role-access-tag">Satellite</span><span class="role-access-tag">GPS</span></div>
+    </div>
+    <div class="role-card" onclick="login('sat')" style="border-color:rgba(139,92,246,.2)">
+      <div class="role-icon">🛰️</div>
+      <div class="role-name">Satellite Analyst</div>
+      <div class="role-desc">Full access to all satellite analysis tools: construction progress, vehicle detection, deforestation monitoring, natural resource intelligence, change detection.</div>
+      <div class="role-access"><span class="role-access-tag">All Portals</span><span class="role-access-tag">AI Engine</span><span class="role-access-tag">Raw Imagery</span></div>
+    </div>
+  </div>
+  <div class="login-footer">Demo mode — no credentials required · InspectGlobal v5 · Anthropic Demo</div>
+</div>
+
+<!-- ═══════════ NAV ═══════════ -->
+<nav id="main-nav" style="display:none">
+  <div class="nav-logo"><span>🛰️</span>Inspect<span class="logo-text">Global</span><span class="nav-version">v5</span></div>
+  <div class="nav-sep"></div>
+  <button class="nav-btn" id="nav-gov" onclick="showPortal('gov')">🏛️ Overview</button>
+  <button class="nav-btn" id="nav-gps" onclick="showPortal('gps')">📍 GPS Fleet</button>
+  <button class="nav-btn" id="nav-sat" onclick="showPortal('sat')">🛰️ Satellite</button>
+  <button class="nav-btn" id="nav-fusion" onclick="showPortal('fusion')">🔗 Fusion</button>
+  <div class="nav-sep"></div>
+  <button class="nav-btn" id="nav-dfi" onclick="showPortal('dfi')">🏦 DFI</button>
+  <button class="nav-btn" id="nav-field" onclick="showPortal('field')">🔧 Field</button>
+  <button class="nav-btn" id="nav-inv" onclick="showPortal('inv')">📈 Invest</button>
+  <button class="nav-btn" id="nav-ins" onclick="showPortal('ins')">🛡️ Insurance</button>
+  <div class="nav-right">
+    <div class="live-pill"><div class="pulse-dot"></div>LIVE · Sentinel-2 in <span id="sat-countdown" style="font-weight:700;margin-left:3px">4h 18m</span></div>
+    <div class="user-pill" onclick="logout()"><div class="user-dot" id="user-dot"></div><span id="user-name">GOV</span> · <span style="color:var(--dgray);font-size:10px">Sign out</span></div>
+  </div>
+</nav>
+
+<!-- Modal -->
+<div id="proj-modal">
+  <div class="modal-box" style="position:relative">
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <div id="modal-content"></div>
+  </div>
+</div>
+
+<!-- ═══════════ GOV PORTAL ═══════════ -->
+<div id="portal-gov" class="portal">
+  <div class="stats-row" style="grid-template-columns:repeat(6,1fr)">
+    <div class="stat c-teal"><div class="stat-val">47</div><div class="stat-label">Active Projects</div><div class="stat-sub up">↑ 8 this quarter</div></div>
+    <div class="stat c-gold"><div class="stat-val">$124B</div><div class="stat-label">Portfolio Value</div><div class="stat-sub up">↑ $18B pipeline</div></div>
+    <div class="stat c-red"><div class="stat-val">9</div><div class="stat-label">Critical Alerts</div><div class="stat-sub down">↑ 3 new today</div></div>
+    <div class="stat c-orange"><div class="stat-val">2,847</div><div class="stat-label">GPS Assets Live</div><div class="stat-sub up">94% online</div></div>
+    <div class="stat c-purple"><div class="stat-val">0.84</div><div class="stat-label">Avg Fusion Score</div><div class="stat-sub up">↑ +0.03 this week</div></div>
+    <div class="stat c-sky"><div class="stat-val">183</div><div class="stat-label">Blockchain Certs</div><div class="stat-sub up">Tamper-proof</div></div>
+  </div>
+  <div class="type-tabs" id="gov-type-tabs"></div>
+  <div class="g2" style="grid-template-columns:1fr 360px">
+    <div>
+      <div class="card" style="margin-bottom:12px">
+        <div class="section-hdr"><div class="section-title">🗺️ Project Map</div><div style="display:flex;gap:5px"><button class="btn" onclick="toggleSatLayer()">🛰️ Toggle Satellite</button><button class="btn">+ Add Project</button></div></div>
+        <div class="map-wrap" id="gov-map" style="height:300px"></div>
+      </div>
+      <div class="section-hdr"><div class="section-title">🏗️ Projects</div><button class="btn">Export Report</button></div>
+      <div class="cards-grid" id="gov-cards"></div>
+    </div>
+    <div>
+      <div class="card" style="margin-bottom:10px">
+        <div class="card-title"><span class="ct-icon">🚨</span>Active Alerts</div>
+        <div id="gov-alerts"></div>
+      </div>
+      <div class="card" style="margin-bottom:10px">
+        <div class="card-title"><span class="ct-icon">📡</span>Satellite Schedule</div>
+        <div id="sat-sched"></div>
+      </div>
+      <div class="card">
+        <div class="section-hdr"><div class="card-title" style="margin:0"><span class="ct-icon">⚡</span>Live Feed</div><div class="live-pill" style="font-size:9px"><div class="pulse-dot"></div>LIVE</div></div>
+        <div id="gov-feed" style="max-height:180px;overflow-y:auto"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ GPS FLEET PORTAL ═══════════ -->
+<div id="portal-gps" class="portal">
+  <div class="stats-row" style="grid-template-columns:repeat(5,1fr)">
+    <div class="stat c-orange"><div class="stat-val">2,847</div><div class="stat-label">Tracked Assets</div><div class="stat-sub up">94.2% online</div></div>
+    <div class="stat c-teal"><div class="stat-val">1,892</div><div class="stat-label">Active Now</div><div class="stat-sub up">67% fleet active</div></div>
+    <div class="stat c-gold"><div class="stat-val">634</div><div class="stat-label">Idle / Standby</div><div class="stat-sub warn">14 idle >4h</div></div>
+    <div class="stat c-red"><div class="stat-val">7</div><div class="stat-label">Geofence Alerts</div><div class="stat-sub down">3 critical tonight</div></div>
+    <div class="stat c-purple"><div class="stat-val">12</div><div class="stat-label">ML Activity Classes</div><div class="stat-sub up">AI classifying live</div></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+    <div class="inner-tabs"><button class="inner-tab active" onclick="selGpsPark('dholera',this)">🏭 Dholera SIR</button><button class="inner-tab" onclick="selGpsPark('bhadla',this)">☀️ Bhadla Solar</button><button class="inner-tab" onclick="selGpsPark('odisha',this)">⛏️ Odisha Mine</button><button class="inner-tab" onclick="selGpsPark('rrts',this)">🚄 Delhi RRTS</button></div>
+    <div style="margin-left:auto;display:flex;gap:6px"><button class="btn">⏱ Replay 24h</button><button class="btn btn-sat">🛰️ Sat Corroboration</button><button class="btn-primary" onclick="showPortal('sat')">View on Satellite →</button></div>
+  </div>
+  <div class="gps-layout">
+    <div class="machine-list">
+      <div class="mlist-hdr"><div style="display:flex;justify-content:space-between"><span>FLEET — <span id="gps-park-name">DHOLERA SIR</span></span><span style="color:var(--mint);font-size:10px" id="gps-count">88 assets</span></div>
+        <div style="display:flex;gap:4px;margin-top:6px">
+          <button class="btn" style="padding:2px 8px;font-size:9px" onclick="filterMachines('all')">All</button>
+          <button class="btn" style="padding:2px 8px;font-size:9px;border-color:var(--mint);color:var(--mint)" onclick="filterMachines('active')">Active</button>
+          <button class="btn" style="padding:2px 8px;font-size:9px" onclick="filterMachines('idle')">Idle</button>
+          <button class="btn" style="padding:2px 8px;font-size:9px;border-color:var(--red);color:var(--red)" onclick="filterMachines('alert')">Alerts</button>
+        </div>
+      </div>
+      <div id="machine-list-body"></div>
+    </div>
+    <div style="position:relative">
+      <div class="map-wrap" id="gps-map" style="height:540px"></div>
+      <div style="position:absolute;bottom:10px;left:10px;z-index:500;background:rgba(5,8,15,.9);border:1px solid var(--bg4);border-radius:7px;padding:8px 10px">
+        <div style="font-size:9px;font-weight:700;color:var(--white);margin-bottom:5px">MACHINE TYPES</div>
+        <div id="gps-legend" style="display:flex;flex-wrap:wrap;gap:5px;max-width:180px"></div>
+      </div>
+      <div style="position:absolute;top:10px;right:10px;z-index:500;background:rgba(5,8,15,.92);border:1px solid var(--purple);border-radius:8px;padding:10px;width:196px">
+        <div style="font-size:9px;font-weight:700;color:var(--purple);margin-bottom:5px">🧠 ML ACTIVITY CLASSES</div>
+        <div id="ml-overlay-content"></div>
+        <div style="margin-top:8px;font-size:9px;font-weight:700;color:var(--dgray)">🛰️ SAT CORROBORATION</div>
+        <div style="font-size:9px;color:var(--mint);margin-top:3px">Sentinel-1 SAR pass 3h ago<br>Equipment count: 86 detected<br>GPS count: 88 — Match ✓</div>
+      </div>
+    </div>
+    <div class="mdetail" id="mdetail-panel">
+      <div class="md-hdr"><div class="md-name" id="md-name">Select a machine</div><div class="md-sub" id="md-sub">Click any machine on the map or list</div></div>
+      <div id="md-body"><div style="padding:20px;text-align:center;color:var(--dgray);font-size:11px">👈 Click any machine to see live details</div></div>
+    </div>
+  </div>
+  <div class="g3" style="margin-top:12px">
+    <div class="card"><div class="card-title">📊 Fleet Activity Distribution</div><canvas id="fleet-chart" height="140"></canvas></div>
+    <div class="card"><div class="card-title">🚨 Geofence Violation Log</div><div id="geofence-log"></div></div>
+    <div class="card"><div class="card-title">🧠 ML Pattern Detection</div><div id="ml-pattern-log"></div></div>
+  </div>
+</div>
+
+<!-- ═══════════ SATELLITE ANALYSIS PORTAL (STAR NEW FEATURE) ═══════════ -->
+<div id="portal-sat" class="portal">
+  <div class="stats-row" style="grid-template-columns:repeat(6,1fr)">
+    <div class="stat c-teal"><div class="stat-val">47</div><div class="stat-label">Projects Monitored</div><div class="stat-sub up">All types covered</div></div>
+    <div class="stat c-purple"><div class="stat-val">8</div><div class="stat-label">Satellite Providers</div><div class="stat-sub up">Sentinel·Planet·Landsat</div></div>
+    <div class="stat c-green"><div class="stat-val">2,847</div><div class="stat-label">Vehicles Detected</div><div class="stat-sub up">SAR + Optical AI</div></div>
+    <div class="stat c-gold"><div class="stat-val">284 km²</div><div class="stat-label">Deforestation Monitored</div><div class="stat-sub warn">3 active alerts</div></div>
+    <div class="stat c-sky"><div class="stat-val">6</div><div class="stat-label">Change Alerts Today</div><div class="stat-sub down">2 critical</div></div>
+    <div class="stat c-orange"><div class="stat-val">0.3mm</div><div class="stat-label">InSAR Precision</div><div class="stat-sub up">Polavaram Dam safe</div></div>
+  </div>
+
+  <!-- Satellite Portal Tabs -->
+  <div class="inner-tabs" style="width:100%;max-width:100%;background:transparent;padding:0;gap:6px;margin-bottom:14px">
+    <button class="inner-tab active" onclick="switchSatTab('progress',this)" style="background:var(--bg3);border:1px solid var(--bg4)">🏗️ Construction Progress</button>
+    <button class="inner-tab" onclick="switchSatTab('detect',this)" style="background:var(--bg3);border:1px solid var(--bg4)">🚛 Vehicle Detection</button>
+    <button class="inner-tab" onclick="switchSatTab('linear',this)" style="background:var(--bg3);border:1px solid var(--bg4)">🛣️ Linear Infrastructure</button>
+    <button class="inner-tab" onclick="switchSatTab('deforest',this)" style="background:var(--bg3);border:1px solid var(--bg4)">🌳 Deforestation</button>
+    <button class="inner-tab" onclick="switchSatTab('resources',this)" style="background:var(--bg3);border:1px solid var(--bg4)">⛏️ Natural Resources</button>
+    <button class="inner-tab" onclick="switchSatTab('change',this)" style="background:var(--bg3);border:1px solid var(--bg4)">🔄 Change Detection</button>
+    <button class="inner-tab" onclick="switchSatTab('insar',this)" style="background:var(--bg3);border:1px solid var(--bg4)">📡 InSAR / Deformation</button>
+  </div>
+
+  <!-- TAB: CONSTRUCTION PROGRESS -->
+  <div id="sat-tab-progress" class="sat-tab">
+    <div class="g2" style="grid-template-columns:1fr 340px;margin-bottom:12px">
+      <div>
+        <div class="card">
+          <div class="section-hdr">
+            <div class="section-title">🛰️ Satellite Construction Monitoring — <span id="sat-prog-project">Dholera SIR</span></div>
+            <div style="display:flex;gap:6px">
+              <select id="sat-prog-selector" onchange="updateSatProgress(this.value)" style="background:var(--bg3);border:1px solid var(--bg4);color:var(--white);padding:4px 8px;border-radius:5px;font-size:10px">
+                <option value="dholera">Dholera SIR — Industrial Park</option>
+                <option value="bhadla">Bhadla Solar Park</option>
+                <option value="mahsr">MAHSR Bullet Train</option>
+                <option value="polavaram">Polavaram Dam</option>
+                <option value="odisha">Odisha Iron Ore Mine</option>
+              </select>
+              <button class="btn-sat">📥 Download GeoTIFF</button>
+            </div>
+          </div>
+          <!-- Timeline slider -->
+          <div style="margin-bottom:10px">
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+              <span style="font-size:10px;color:var(--dgray)">SATELLITE TIMELINE — Monthly Composite</span>
+              <span id="sat-date-label" style="font-size:10px;color:var(--teal);font-weight:700">Mar 2026</span>
+            </div>
+            <input type="range" class="timeline-slider" id="sat-timeline" min="0" max="11" value="11" oninput="updateSatTimeline(this.value)">
+            <div class="timeline-labels" id="timeline-month-labels"></div>
+          </div>
+          <!-- Main satellite canvas + detection overlay -->
+          <div class="canvas-container" style="height:280px;border-radius:8px;overflow:hidden;position:relative;border:1px solid var(--bg4)">
+            <canvas id="sat-main-canvas" style="width:100%;height:100%;display:block;image-rendering:pixelated"></canvas>
+            <canvas id="sat-detect-overlay" style="position:absolute;top:0;left:0;width:100%;height:100%"></canvas>
+            <div class="scan-line"></div>
+            <div style="position:absolute;top:8px;left:8px;background:rgba(5,8,15,.85);border:1px solid var(--bg4);border-radius:5px;padding:5px 8px">
+              <div id="sat-band-label" style="font-size:9px;font-weight:700;color:var(--teal)">NDVI — Sentinel-2 B8/B4</div>
+              <div style="display:flex;gap:2px;margin-top:3px;height:6px;width:100px;border-radius:3px;overflow:hidden">
+                <div style="flex:1;background:rgb(139,69,19)"></div><div style="flex:1;background:rgb(160,120,60)"></div><div style="flex:1;background:rgb(180,180,80)"></div>
+                <div style="flex:1;background:rgb(100,160,60)"></div><div style="flex:1;background:rgb(30,130,30)"></div>
+              </div>
+              <div style="display:flex;justify-content:space-between;width:100px;font-size:8px;color:var(--dgray);margin-top:1px"><span>-0.2</span><span>NDVI</span><span>+0.9</span></div>
+            </div>
+            <div id="sat-band-toggle" style="position:absolute;top:8px;right:8px;display:flex;flex-direction:column;gap:3px">
+              <button class="btn" style="padding:2px 7px;font-size:9px;border-color:var(--mint);color:var(--mint)" onclick="setSatBand('ndvi')">NDVI</button>
+              <button class="btn" style="padding:2px 7px;font-size:9px" onclick="setSatBand('sar')">SAR</button>
+              <button class="btn" style="padding:2px 7px;font-size:9px" onclick="setSatBand('rgb')">RGB</button>
+              <button class="btn" style="padding:2px 7px;font-size:9px" onclick="setSatBand('swir')">SWIR</button>
+            </div>
+            <div id="det-count-overlay" style="position:absolute;bottom:8px;right:8px;background:rgba(5,8,15,.85);border:1px solid var(--orange);border-radius:5px;padding:5px 8px;font-size:9px">
+              <div style="color:var(--orange);font-weight:700">🚛 AI DETECTION ACTIVE</div>
+              <div id="det-count-text" style="color:var(--white);margin-top:2px">14 equipment detected</div>
+            </div>
+          </div>
+          <!-- AI detection toggle -->
+          <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+            <button class="btn" onclick="toggleDetection(this)" style="border-color:var(--orange);color:var(--orange)" id="det-toggle">✓ Show AI Detections</button>
+            <button class="btn" onclick="setSatBand('ndvi')">NDVI Overlay</button>
+            <button class="btn" onclick="setSatBand('sar')">SAR Backscatter</button>
+            <button class="btn" onclick="compareToggle()">🔄 Before/After</button>
+            <span style="font-size:10px;color:var(--dgray);align-self:center;margin-left:auto">Next pass: Sentinel-2 in <span style="color:var(--mint)">4h 18m</span></span>
+          </div>
+        </div>
+      </div>
+      <!-- Right panel -->
+      <div>
+        <div class="card" style="margin-bottom:10px">
+          <div class="card-title">📊 Progress by Metric</div>
+          <div id="sat-progress-metrics"></div>
+        </div>
+        <div class="card" style="margin-bottom:10px">
+          <div class="card-title">📈 Monthly Progress Chart</div>
+          <canvas id="sat-monthly-chart" height="150"></canvas>
+        </div>
+        <div class="card">
+          <div class="card-title">🛰️ Satellite Passes</div>
+          <div id="sat-passes-list"></div>
+        </div>
+      </div>
+    </div>
+    <!-- Bottom row: AI detections table -->
+    <div class="card">
+      <div class="section-hdr"><div class="section-title">🤖 AI Object Detection — Satellite Imagery</div><span style="font-size:10px;color:var(--dgray)">YOLOv8 + SAM · Sentinel-2 10m + Planet 3m · Confidence threshold: 0.65</span></div>
+      <table class="dtable">
+        <thead><tr><th>Object Class</th><th>Count (Satellite)</th><th>Count (GPS)</th><th>Match</th><th>Confidence</th><th>Model</th><th>Band Used</th><th>Last Detection</th></tr></thead>
+        <tbody id="sat-detect-table"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- TAB: VEHICLE DETECTION -->
+  <div id="sat-tab-detect" class="sat-tab" style="display:none">
+    <div class="g2" style="grid-template-columns:1fr 340px">
+      <div>
+        <div class="card">
+          <div class="section-hdr">
+            <div class="section-title">🚛 Satellite Vehicle & Equipment Detection</div>
+            <div style="display:flex;gap:5px">
+              <select style="background:var(--bg3);border:1px solid var(--bg4);color:var(--white);padding:4px 8px;border-radius:5px;font-size:10px">
+                <option>Dholera SIR — Planet 3m</option><option>Bhadla Solar — Planet 3m</option><option>Odisha Mine — Planet 3m</option>
+              </select>
+              <button class="btn-sat">Run Inference</button>
+            </div>
+          </div>
+          <!-- Vehicle detection canvas -->
+          <div class="canvas-container" style="height:340px;border-radius:8px;overflow:hidden;position:relative;border:1px solid var(--bg4)">
+            <canvas id="vdet-canvas" style="width:100%;height:100%;display:block;image-rendering:pixelated"></canvas>
+            <canvas id="vdet-overlay" style="position:absolute;top:0;left:0;width:100%;height:100%"></canvas>
+            <div style="position:absolute;top:8px;left:8px;background:rgba(5,8,15,.85);border:1px solid var(--bg4);border-radius:5px;padding:5px 8px">
+              <div style="font-size:9px;font-weight:700;color:var(--orange)">Planet PlanetScope · 3m · 20 Mar 2026 · 10:42 UTC</div>
+              <div style="font-size:9px;color:var(--dgray)">False color composite B4/B3/B2 (R/G/B)</div>
+            </div>
+            <div id="vdet-counter" style="position:absolute;bottom:8px;left:8px;background:rgba(5,8,15,.9);border:1px solid var(--orange);border-radius:5px;padding:6px 10px">
+              <div style="font-size:9px;font-weight:700;color:var(--orange)">🤖 YOLOv8 DETECTIONS</div>
+              <div id="vdet-counts" style="font-size:10px;color:var(--white);margin-top:2px"></div>
+            </div>
+          </div>
+          <!-- Detection class legend -->
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+            <span style="font-size:9px;color:var(--dgray)">DETECTION CLASSES:</span>
+            <span style="font-size:9px;display:flex;align-items:center;gap:3px"><span style="width:10px;height:10px;background:#E53E3E;border-radius:2px;display:inline-block"></span>Excavators</span>
+            <span style="font-size:9px;display:flex;align-items:center;gap:3px"><span style="width:10px;height:10px;background:#F6891F;border-radius:2px;display:inline-block"></span>Bulldozers</span>
+            <span style="font-size:9px;display:flex;align-items:center;gap:3px"><span style="width:10px;height:10px;background:#F0A500;border-radius:2px;display:inline-block"></span>Dump Trucks</span>
+            <span style="font-size:9px;display:flex;align-items:center;gap:3px"><span style="width:10px;height:10px;background:#38BDF8;border-radius:2px;display:inline-block"></span>Tower Cranes</span>
+            <span style="font-size:9px;display:flex;align-items:center;gap:3px"><span style="width:10px;height:10px;background:#22C55E;border-radius:2px;display:inline-block"></span>Pavers/Rollers</span>
+            <span style="font-size:9px;display:flex;align-items:center;gap:3px"><span style="width:10px;height:10px;background:#8B5CF6;border-radius:2px;display:inline-block"></span>Light Vehicles</span>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="card" style="margin-bottom:10px">
+          <div class="card-title">📊 Detection Count — Satellite vs GPS</div>
+          <canvas id="vdet-compare-chart" height="180"></canvas>
+        </div>
+        <div class="card" style="margin-bottom:10px">
+          <div class="card-title">🌙 Night Activity Detection — SAR</div>
+          <div id="sar-night-detections"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">📅 Detection History — 30 Days</div>
+          <canvas id="vdet-history-chart" height="120"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: LINEAR INFRASTRUCTURE -->
+  <div id="sat-tab-linear" class="sat-tab" style="display:none">
+    <div class="g2" style="grid-template-columns:1fr 340px">
+      <div>
+        <div class="card">
+          <div class="section-hdr">
+            <div class="section-title">🛣️ Linear Infrastructure Monitoring — Satellite</div>
+            <div class="inner-tabs" style="margin:0"><button class="inner-tab active" onclick="setLinearType('railway',this)">🚄 Railway</button><button class="inner-tab" onclick="setLinearType('road',this)">🛣️ Road</button><button class="inner-tab" onclick="setLinearType('transmission',this)">🔌 Transmission</button></div>
+          </div>
+          <div id="linear-project-info" style="margin-bottom:10px"></div>
+          <!-- Corridor visualization -->
+          <div style="margin-bottom:10px">
+            <div style="font-size:10px;color:var(--dgray);margin-bottom:5px">CORRIDOR PROGRESS — <span id="linear-corridor-label">82km · Delhi-Meerut RRTS</span></div>
+            <div class="corridor-track" id="linear-corridor" style="height:70px"></div>
+            <div class="corridor-km" id="linear-km-labels"></div>
+          </div>
+          <!-- Satellite view of corridor -->
+          <div class="canvas-container" style="height:240px;border-radius:8px;overflow:hidden;position:relative;border:1px solid var(--bg4)">
+            <canvas id="linear-canvas" style="width:100%;height:100%;display:block;image-rendering:pixelated"></canvas>
+            <canvas id="linear-overlay" style="position:absolute;top:0;left:0;width:100%;height:100%"></canvas>
+            <div class="scan-line"></div>
+            <div style="position:absolute;top:8px;left:8px;background:rgba(5,8,15,.85);border:1px solid var(--bg4);border-radius:5px;padding:5px 8px;font-size:9px">
+              <div style="color:var(--teal);font-weight:700" id="linear-sat-label">NDVI — Corridor Buffer 200m</div>
+              <div style="color:var(--dgray);margin-top:2px">Track-laying machine GPS: <span style="color:var(--mint)">km 68.4</span></div>
+            </div>
+          </div>
+          <!-- Segment progress table -->
+          <div style="margin-top:10px;overflow-x:auto">
+            <table class="dtable" id="linear-seg-table">
+              <thead><tr><th>Segment</th><th>Type</th><th>Satellite Status</th><th>Progress</th><th>GPS Equipment</th><th>Last Update</th><th>Alert</th></tr></thead>
+              <tbody id="linear-seg-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="card" style="margin-bottom:10px">
+          <div class="card-title">📈 Monthly Progress — km/month</div>
+          <canvas id="linear-progress-chart" height="150"></canvas>
+        </div>
+        <div class="card" style="margin-bottom:10px">
+          <div class="card-title">⚠️ Segment Alerts</div>
+          <div id="linear-alerts"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">🛰️ Satellite Detection Legend</div>
+          <div id="linear-legend"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: DEFORESTATION -->
+  <div id="sat-tab-deforest" class="sat-tab" style="display:none">
+    <div class="g2" style="grid-template-columns:1fr 340px">
+      <div>
+        <div class="card">
+          <div class="section-hdr"><div class="section-title">🌳 Deforestation & Forest Intelligence</div><button class="btn-sat">🔔 Set Alert Threshold</button></div>
+          <div style="display:flex;gap:8px;margin-bottom:10px">
+            <select style="background:var(--bg3);border:1px solid var(--bg4);color:var(--white);padding:4px 8px;border-radius:5px;font-size:10px;flex:1">
+              <option>Kalimantan Industrial Corridor — Indonesia</option><option>Krishnapatnam Buffer Zone — India</option><option>Nairobi Highway Corridor — Kenya</option>
+            </select>
+            <div class="inner-tabs" style="margin:0"><button class="inner-tab active" onclick="setDeforestView('ndvi',this)">NDVI</button><button class="inner-tab" onclick="setDeforestView('cover',this)">Cover%</button><button class="inner-tab" onclick="setDeforestView('alert',this)">Alerts</button></div>
+          </div>
+          <div class="canvas-container" style="height:300px;position:relative;border-radius:8px;overflow:hidden;border:1px solid var(--bg4)">
+            <canvas id="deforest-canvas" style="width:100%;height:100%;display:block;image-rendering:pixelated"></canvas>
+            <div style="position:absolute;top:8px;left:8px;background:rgba(5,8,15,.85);border:1px solid var(--bg4);border-radius:5px;padding:5px 8px">
+              <div style="font-size:9px;font-weight:700;color:var(--mint)">NDVI — Sentinel-2 · <span id="deforest-date">Mar 2026</span></div>
+              <div style="display:flex;height:7px;width:140px;border-radius:3px;overflow:hidden;margin-top:3px;gap:0">
+                <div style="flex:1;background:rgb(139,69,19)"></div><div style="flex:1;background:rgb(160,100,40)"></div>
+                <div style="flex:1;background:rgb(200,180,60)"></div><div style="flex:1;background:rgb(120,170,60)"></div>
+                <div style="flex:1;background:rgb(30,120,30)"></div><div style="flex:1;background:rgb(10,70,10)"></div>
+              </div>
+              <div style="display:flex;justify-content:space-between;width:140px;font-size:7px;color:var(--dgray);margin-top:1px"><span>Cleared</span><span>←NDVI→</span><span>Dense Forest</span></div>
+            </div>
+            <div id="deforest-alert-zones"></div>
+          </div>
+          <div style="margin-top:8px">
+            <div style="font-size:10px;color:var(--dgray);margin-bottom:5px">TIMELINE — Forest Cover Change</div>
+            <input type="range" class="timeline-slider" min="0" max="11" value="11" oninput="updateDeforestTimeline(this.value)">
+            <div class="timeline-labels"><span>Mar 2025</span><span>Jun</span><span>Sep</span><span>Dec</span><span>Mar 2026</span></div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="card" style="margin-bottom:10px">
+          <div class="card-title">📊 Forest Cover Change — Monthly</div>
+          <canvas id="forest-cover-chart" height="160"></canvas>
+        </div>
+        <div class="card" style="margin-bottom:10px">
+          <div class="card-title">🚨 Deforestation Alerts</div>
+          <div id="deforest-alerts"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">📏 Loss by Project Zone</div>
+          <div id="deforest-zones"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: NATURAL RESOURCES -->
+  <div id="sat-tab-resources" class="sat-tab" style="display:none">
+    <div class="g2" style="grid-template-columns:1fr 340px">
+      <div>
+        <div class="card">
+          <div class="section-hdr"><div class="section-title">⛏️ Natural Resource Intelligence</div>
+            <div class="inner-tabs" style="margin:0">
+              <button class="inner-tab active" onclick="setResourceMode('mineral',this)">🪨 Minerals</button>
+              <button class="inner-tab" onclick="setResourceMode('water',this)">💧 Water</button>
+              <button class="inner-tab" onclick="setResourceMode('thermal',this)">🔥 Thermal</button>
+              <button class="inner-tab" onclick="setResourceMode('soil',this)">🌱 Soil</button>
+            </div>
+          </div>
+          <div class="canvas-container" style="height:280px;position:relative;border-radius:8px;overflow:hidden;border:1px solid var(--bg4)">
+            <canvas id="resource-canvas" style="width:100%;height:100%;display:block;image-rendering:pixelated"></canvas>
+            <div style="position:absolute;top:8px;left:8px;background:rgba(5,8,15,.85);border:1px solid var(--bg4);border-radius:5px;padding:5px 8px" id="resource-band-info">
+              <div style="font-size:9px;font-weight:700;color:var(--purple)">SWIR COMPOSITE — Mineral Mapping</div>
+              <div style="font-size:9px;color:var(--dgray);margin-top:2px">Sentinel-2 B11/B8/B2 (SWIR/NIR/Blue)</div>
+            </div>
+          </div>
+          <div class="resource-legend" id="resource-legend-content"></div>
+          <div style="margin-top:10px">
+            <div class="card-title">📋 Resource Intelligence Findings</div>
+            <div id="resource-findings"></div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="card" style="margin-bottom:10px">
+          <div class="card-title">💧 Water Body Monitoring — NDWI</div>
+          <canvas id="water-chart" height="140"></canvas>
+        </div>
+        <div class="card" style="margin-bottom:10px">
+          <div class="card-title">🌡️ Thermal Anomalies — Night LWIR</div>
+          <div id="thermal-anomalies"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">⛏️ Extraction Volume Tracking</div>
+          <div id="extraction-volumes"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: CHANGE DETECTION -->
+  <div id="sat-tab-change" class="sat-tab" style="display:none">
+    <div class="g2" style="grid-template-columns:1fr 340px">
+      <div>
+        <div class="card">
+          <div class="section-hdr"><div class="section-title">🔄 Change Detection — Before / After</div>
+            <div style="display:flex;gap:5px">
+              <select style="background:var(--bg3);border:1px solid var(--bg4);color:var(--white);padding:4px 8px;border-radius:5px;font-size:10px">
+                <option>Oct 2025 vs Mar 2026</option><option>Mar 2025 vs Mar 2026</option><option>Jun 2025 vs Mar 2026</option>
+              </select>
+              <button class="btn-sat">Export Change Report</button>
+            </div>
+          </div>
+          <!-- Split view -->
+          <div id="split-container" style="position:relative;height:300px;border-radius:8px;overflow:hidden;border:1px solid var(--bg4);cursor:col-resize">
+            <canvas id="split-before-canvas" style="position:absolute;top:0;left:0;height:100%;image-rendering:pixelated"></canvas>
+            <canvas id="split-after-canvas" style="position:absolute;top:0;right:0;height:100%;image-rendering:pixelated"></canvas>
+            <div id="split-divider" style="position:absolute;top:0;bottom:0;width:3px;background:var(--white);cursor:col-resize;z-index:10;display:flex;align-items:center;justify-content:center;left:50%">
+              <div style="background:var(--white);color:var(--bg);font-size:9px;padding:3px 6px;border-radius:8px;white-space:nowrap;font-weight:700">◀ BEFORE | AFTER ▶</div>
+            </div>
+            <div style="position:absolute;bottom:8px;left:10px;background:rgba(5,8,15,.85);border-radius:4px;padding:3px 7px;font-size:9px;font-weight:700;color:var(--dgray)">OCT 2025</div>
+            <div style="position:absolute;bottom:8px;right:10px;background:rgba(5,8,15,.85);border-radius:4px;padding:3px 7px;font-size:9px;font-weight:700;color:var(--teal)">MAR 2026</div>
+          </div>
+          <!-- Change heatmap -->
+          <div style="margin-top:10px">
+            <div class="card-title" style="margin-bottom:7px">🌡️ Change Magnitude Heatmap</div>
+            <div class="canvas-container" style="height:160px;border-radius:7px;overflow:hidden;border:1px solid var(--bg4)">
+              <canvas id="change-heatmap" style="width:100%;height:100%;display:block;image-rendering:pixelated"></canvas>
+            </div>
+            <div style="display:flex;gap:6px;margin-top:5px;font-size:9px;color:var(--dgray);align-items:center">
+              <span style="background:#1a4f8a;padding:1px 6px;border-radius:3px">New Water</span>
+              <span style="background:#2d6a2d;padding:1px 6px;border-radius:3px">Vegetation Gain</span>
+              <span style="background:#8a3a1a;padding:1px 6px;border-radius:3px">Construction</span>
+              <span style="background:#8a1a1a;padding:1px 6px;border-radius:3px">Clearing</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="card" style="margin-bottom:10px">
+          <div class="card-title">📊 Change by Category</div>
+          <canvas id="change-category-chart" height="180"></canvas>
+        </div>
+        <div class="card" style="margin-bottom:10px">
+          <div class="card-title">🚨 Significant Changes</div>
+          <div id="change-alerts"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">📏 Change Area Statistics</div>
+          <div id="change-stats"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: INSAR -->
+  <div id="sat-tab-insar" class="sat-tab" style="display:none">
+    <div class="g2" style="grid-template-columns:1fr 340px">
+      <div>
+        <div class="card">
+          <div class="section-hdr"><div class="section-title">📡 InSAR Ground Deformation Monitoring</div>
+            <select style="background:var(--bg3);border:1px solid var(--bg4);color:var(--white);padding:4px 8px;border-radius:5px;font-size:10px">
+              <option>Polavaram Dam — CRITICAL MONITORING</option><option>Dholera SIR — Road Settlement</option><option>Odisha Mine — Pit Wall</option>
+            </select>
+          </div>
+          <div class="canvas-container" style="height:280px;position:relative;border-radius:8px;overflow:hidden;border:1px solid var(--bg4)">
+            <canvas id="insar-canvas" style="width:100%;height:100%;display:block;image-rendering:pixelated"></canvas>
+            <div style="position:absolute;top:8px;left:8px;background:rgba(5,8,15,.85);border:1px solid var(--bg4);border-radius:5px;padding:6px 9px">
+              <div style="font-size:9px;font-weight:700;color:var(--teal)">Sentinel-1 InSAR · Ascending Orbit · 6-day repeat</div>
+              <div style="font-size:9px;color:var(--dgray);margin-top:2px">Line-of-sight displacement · mm precision</div>
+              <div style="display:flex;gap:1px;height:6px;width:120px;border-radius:3px;overflow:hidden;margin-top:4px">
+                <div style="flex:1;background:hsl(240,80%,40%)"></div><div style="flex:1;background:hsl(200,80%,50%)"></div>
+                <div style="flex:1;background:hsl(120,80%,40%)"></div><div style="flex:1;background:hsl(60,80%,50%)"></div>
+                <div style="flex:1;background:hsl(0,80%,50%)"></div>
+              </div>
+              <div style="display:flex;justify-content:space-between;width:120px;font-size:7px;color:var(--dgray);margin-top:1px"><span>-10mm</span><span>0</span><span>+10mm</span></div>
+            </div>
+            <div id="insar-alert-box" style="position:absolute;bottom:8px;left:8px;right:8px;background:rgba(5,8,15,.9);border:1px solid var(--mint);border-radius:5px;padding:6px 9px;font-size:9px">
+              <div style="color:var(--mint);font-weight:700">⚠️ DEFORMATION STATUS</div>
+              <div id="insar-status-text" style="color:var(--white);margin-top:2px"></div>
+            </div>
+          </div>
+          <!-- Time series chart -->
+          <div style="margin-top:10px">
+            <div class="card-title">📈 Deformation Time Series — Max Displacement</div>
+            <canvas id="insar-timeseries" height="120"></canvas>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="card" style="margin-bottom:10px">
+          <div class="card-title">📍 Monitoring Points</div>
+          <div id="insar-points"></div>
+        </div>
+        <div class="card" style="margin-bottom:10px">
+          <div class="card-title">🚨 Deformation Alerts</div>
+          <div id="insar-alerts"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">🌊 Dam Safety Profile</div>
+          <div id="insar-dam-safety"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ FUSION INTEL PORTAL ═══════════ -->
+<div id="portal-fusion" class="portal">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+    <div class="inner-tabs"><button class="inner-tab active" onclick="selFusionProj('dholera',this)">Dholera SIR</button><button class="inner-tab" onclick="selFusionProj('bhadla',this)">Bhadla Solar</button><button class="inner-tab" onclick="selFusionProj('krishna',this)">Krishnapatnam</button><button class="inner-tab" onclick="selFusionProj('polavaram',this)">Polavaram Dam</button></div>
+    <div style="margin-left:auto"><button class="btn-sat">📊 Export Intel Report</button></div>
+  </div>
+  <div class="g2" style="grid-template-columns:1fr 360px">
+    <div>
+      <!-- Master score -->
+      <div class="card" style="margin-bottom:12px;background:linear-gradient(135deg,var(--bg3),var(--bg4));border-color:var(--teal)">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;text-align:center">
+          <div><div style="font-size:58px;font-weight:900;color:var(--white);line-height:1" id="f-score">87</div><div style="font-size:12px;color:var(--teal);margin-top:3px;font-weight:600">FUSION SCORE</div><div style="font-size:10px;color:var(--dgray);margin-top:2px">9 Sources · HIGH CONFIDENCE</div></div>
+          <div><div style="font-size:34px;font-weight:900;color:var(--mint)" id="f-progress">79%</div><div style="font-size:11px;color:var(--dgray)">Physical Progress</div><div style="font-size:10px;color:var(--gold);margin-top:3px" id="f-tranche">Tranche 4 — 1% gap</div></div>
+          <div><div style="font-size:34px;font-weight:900;color:var(--orange)" id="f-assets">88</div><div style="font-size:11px;color:var(--dgray)">GPS Assets Active</div><div style="font-size:10px;color:var(--mint);margin-top:3px">1 Geofence Alert</div></div>
+        </div>
+      </div>
+      <!-- Source grid -->
+      <div class="section-hdr"><div class="section-title">🔗 Intelligence Sources — 9 Active</div></div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px" id="fusion-sources"></div>
+      <!-- Summary table -->
+      <div class="card">
+        <div class="card-title">🧠 Combined Intelligence Summary</div>
+        <table class="dtable" id="fusion-summary-table">
+          <thead><tr><th>Source</th><th>Key Finding</th><th>Score</th><th>Weight</th><th>Impact</th></tr></thead>
+          <tbody id="fusion-summary-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div>
+      <div class="card" style="margin-bottom:10px">
+        <div class="card-title">⏱ Source Reliability — 7 Days</div>
+        <canvas id="fusion-timeline" height="180"></canvas>
+      </div>
+      <div class="card" style="margin-bottom:10px">
+        <div class="card-title">🕐 Data Freshness</div>
+        <div id="fusion-freshness"></div>
+      </div>
+      <div class="card" style="margin-bottom:10px">
+        <div class="card-title">⚠️ Source Disagreements</div>
+        <div id="fusion-disagreements"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">🔗 Evidence Certificates</div>
+        <div id="fusion-certs"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ DFI PORTAL ═══════════ -->
+<div id="portal-dfi" class="portal">
+  <div class="stats-row" style="grid-template-columns:repeat(5,1fr)">
+    <div class="stat c-teal"><div class="stat-val">$48.2B</div><div class="stat-label">Loan Portfolio</div></div>
+    <div class="stat c-sky"><div class="stat-val">$31.4B</div><div class="stat-label">Disbursed</div><div class="stat-sub up">65.1%</div></div>
+    <div class="stat c-gold"><div class="stat-val">14</div><div class="stat-label">Tranches Pending</div><div class="stat-sub warn">3 newly met</div></div>
+    <div class="stat c-red"><div class="stat-val">3</div><div class="stat-label">Blocked Tranches</div></div>
+    <div class="stat c-purple"><div class="stat-val">183</div><div class="stat-label">Certs Issued</div></div>
+  </div>
+  <div class="g2" style="grid-template-columns:1fr 320px">
+    <div>
+      <div class="card" style="margin-bottom:12px"><div class="section-hdr"><div class="section-title">🏦 Loan Portfolio</div><div style="display:flex;gap:5px"><button class="btn">Export</button><button class="btn">Filter</button></div></div>
+        <table class="dtable"><thead><tr><th>Project</th><th>Type</th><th>Funder</th><th>Loan $M</th><th>Disbursed</th><th>Progress</th><th>AI Score</th><th>Status</th></tr></thead><tbody id="dfi-tbody"></tbody></table></div>
+      <div class="card"><div class="section-hdr"><div class="section-title">💰 Tranche Queue</div><span style="font-size:10px;color:var(--gold)">3 conditions newly met via satellite</span></div>
+        <table class="dtable"><thead><tr><th>Project</th><th>Tranche</th><th>Amount</th><th>Condition</th><th>Required</th><th>Actual</th><th>Evidence</th><th>Status</th></tr></thead><tbody id="tranche-tbody"></tbody></table></div>
+    </div>
+    <div>
+      <div class="card" style="margin-bottom:10px"><div class="card-title">🔗 Recent Certs</div><div id="dfi-certs"></div></div>
+      <div class="card" style="margin-bottom:10px"><div class="card-title">📊 Portfolio by Type</div><canvas id="dfi-chart" height="150"></canvas></div>
+      <div class="card"><div class="card-title">🚨 DFI Alerts</div><div id="dfi-alerts"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ FIELD PORTAL ═══════════ -->
+<div id="portal-field" class="portal">
+  <div class="stats-row" style="grid-template-columns:repeat(6,1fr)">
+    <div class="stat c-teal"><div class="stat-val">847</div><div class="stat-label">IoT Sensors Online</div><div class="stat-sub up">96.4%</div></div>
+    <div class="stat c-orange"><div class="stat-val">2,847</div><div class="stat-label">GPS Assets</div><div class="stat-sub up">Live</div></div>
+    <div class="stat c-sky"><div class="stat-val">124</div><div class="stat-label">Cameras Active</div><div class="stat-sub warn">8 offline</div></div>
+    <div class="stat c-purple"><div class="stat-val">34</div><div class="stat-label">Edge AI Devices</div><div class="stat-sub up">28 processing</div></div>
+    <div class="stat c-gold"><div class="stat-val">7</div><div class="stat-label">Drone Missions</div><div class="stat-sub up">2 in flight</div></div>
+    <div class="stat c-green"><div class="stat-val">19</div><div class="stat-label">Acoustic Sensors</div></div>
+  </div>
+  <div class="inner-tabs">
+    <button class="inner-tab active" onclick="switchFieldTab('iot',this)">🌡️ IoT Sensors</button>
+    <button class="inner-tab" onclick="switchFieldTab('edge',this)">🖥️ Edge AI</button>
+    <button class="inner-tab" onclick="switchFieldTab('drone',this)">🚁 Drones</button>
+    <button class="inner-tab" onclick="switchFieldTab('cameras',this)">📷 Cameras</button>
+    <button class="inner-tab" onclick="switchFieldTab('acoustic',this)">🎙️ Acoustic</button>
+  </div>
+  <div id="field-iot" class="field-tab">
+    <div class="g3"><div class="card"><div class="card-title">🌬️ Air Quality</div><div id="iot-air"></div></div><div class="card"><div class="card-title">💧 Water Quality</div><div id="iot-water"></div></div><div class="card"><div class="card-title">📳 Structural</div><div id="iot-struct"></div></div></div>
+    <div class="g2" style="margin-top:12px"><div class="card"><div class="card-title">📊 Turbidity Trend</div><canvas id="turb-chart" height="130"></canvas></div><div class="card"><div class="card-title">📊 PM2.5 Trend</div><canvas id="pm25-chart" height="130"></canvas></div></div>
+  </div>
+  <div id="field-edge" class="field-tab" style="display:none"><div class="cards-grid" id="edge-grid"></div><div class="g2" style="margin-top:12px"><div class="card"><div class="card-title">📊 Edge Inference Events</div><canvas id="edge-chart" height="130"></canvas></div><div class="card"><div class="card-title">🔒 Security Events</div><div id="edge-sec-log"></div></div></div></div>
+  <div id="field-drone" class="field-tab" style="display:none"><div class="g2"><div id="drone-list"></div><div><div class="card"><div class="card-title">📦 Stockpile Change</div><div id="drone-stockpile"></div></div></div></div></div>
+  <div id="field-cameras" class="field-tab" style="display:none"><div class="cards-grid" id="cam-grid"></div></div>
+  <div id="field-acoustic" class="field-tab" style="display:none"><div class="g3"><div class="card"><div class="card-title">💥 Blast Detection</div><div id="acou-blast"></div></div><div class="card"><div class="card-title">📊 Activity Level</div><canvas id="acou-chart" height="160"></canvas></div><div class="card"><div class="card-title">🌙 Night Anomalies</div><div id="acou-night"></div></div></div></div>
+</div>
+
+<!-- ═══════════ INVESTOR PORTAL ═══════════ -->
+<div id="portal-inv" class="portal">
+  <div class="stats-row" style="grid-template-columns:repeat(4,1fr)"><div class="stat c-teal"><div class="stat-val">$124B</div><div class="stat-label">Pipeline Value</div></div><div class="stat c-gold"><div class="stat-val">47</div><div class="stat-label">Projects</div></div><div class="stat c-sky"><div class="stat-val">82%</div><div class="stat-label">Avg AI Score</div></div><div class="stat c-green"><div class="stat-val">12.4%</div><div class="stat-label">Avg Projected IRR</div></div></div>
+  <div class="g2"><div class="card"><div class="card-title">📊 Portfolio by Type</div><canvas id="inv-type-chart" height="200"></canvas></div><div class="card"><div class="card-title">🌍 By Country</div><canvas id="inv-country-chart" height="200"></canvas></div></div>
+  <div class="card" style="margin-top:12px"><div class="section-hdr"><div class="section-title">🏆 Investment Opportunities</div></div>
+    <table class="dtable"><thead><tr><th>Project</th><th>Type</th><th>Country</th><th>Size $B</th><th>Progress</th><th>AI Score</th><th>Fusion</th><th>IRR Est.</th><th>Risk</th></tr></thead><tbody id="inv-tbody"></tbody></table></div>
+</div>
+
+<!-- ═══════════ INSURANCE PORTAL ═══════════ -->
+<div id="portal-ins" class="portal">
+  <div class="stats-row" style="grid-template-columns:repeat(4,1fr)"><div class="stat c-red"><div class="stat-val">8</div><div class="stat-label">Active Claims</div></div><div class="stat c-gold"><div class="stat-val">$2.4B</div><div class="stat-label">Total Policies</div></div><div class="stat c-sky"><div class="stat-val">14</div><div class="stat-label">High Risk</div></div><div class="stat c-mint"><div class="stat-val">97%</div><div class="stat-label">Evidence Coverage</div></div></div>
+  <div class="g2"><div class="card"><div class="card-title">🏥 Risk Queue</div><table class="dtable"><thead><tr><th>Project</th><th>Type</th><th>Risk</th><th>InSAR</th><th>AI Score</th><th>Action</th></tr></thead><tbody id="ins-tbody"></tbody></table></div><div><div class="card" style="margin-bottom:10px"><div class="card-title">📊 Risk Radar</div><canvas id="ins-radar" height="200"></canvas></div><div class="card"><div class="card-title">🔍 Active Claims</div><div id="ins-claims"></div></div></div></div>
+</div>
+
+
+<script>
+// ═══════════════════════════════════════════
+// DATA
+// ═══════════════════════════════════════════
+const TMAP='https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+const SATMAP='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+const PTCOLS={indpark:'#00B4CC',solar:'#F59E0B',wind:'#38BDF8',mining:'#B45309',railway:'#22C55E',road:'#94A3B8',port:'#06B6D4',dam:'#3B82F6',power:'#EF4444',transmission:'#8B5CF6'};
+const PTICONS={indpark:'🏭',solar:'☀️',wind:'💨',mining:'⛏️',railway:'🚄',road:'🛣️',port:'⚓',dam:'🌊',power:'⚡',transmission:'🔌'};
+
+const ROLE_CONFIG={
+  gov:{name:'GOV Officer',color:'#00D68F',portals:['gov','gps','sat','fusion']},
+  dfi:{name:'DFI Analyst',color:'#38BDF8',portals:['dfi','sat','fusion']},
+  inv:{name:'Investor',color:'#F0A500',portals:['inv','sat']},
+  field:{name:'Field Inspector',color:'#F6891F',portals:['gps','field','sat','fusion']},
+  ins:{name:'Insurance',color:'#E53E3E',portals:['ins','sat','gps']},
+  sat:{name:'Satellite Analyst',color:'#8B5CF6',portals:['gov','gps','sat','fusion','dfi','field','inv','ins']},
+};
+
+const ALL_PROJECTS=[
+  {id:'dholera',n:'Dholera SIR',t:'indpark',c:'India',s:'Gujarat',lat:22.24,lng:72.21,prog:79,ai:84,alert:'warn',funder:'ADB',loanM:1200,fs:0.87,gps:88,inv:38000,
+   metrics:[{label:'Roads',pct:82,col:'#22C55E'},{label:'Power Infra',pct:74,col:'#F59E0B'},{label:'Drainage',pct:88,col:'#38BDF8'},{label:'Utilities',pct:68,col:'#8B5CF6'}]},
+  {id:'auric',n:'AURIC',t:'indpark',c:'India',s:'Maharashtra',lat:19.87,lng:75.34,prog:84,ai:91,alert:null,funder:'ADB',loanM:800,fs:0.92,gps:64,inv:24000},
+  {id:'krishna',n:'Krishnapatnam NITI',t:'indpark',c:'India',s:'Andhra Pradesh',lat:14.25,lng:80.05,prog:61,ai:54,alert:'crit',funder:'ADB',loanM:920,fs:0.61,gps:42,inv:29000},
+  {id:'bhadla',n:'Bhadla Solar Park',t:'solar',c:'India',s:'Rajasthan',lat:27.54,lng:71.92,prog:88,ai:84,alert:'warn',funder:'NTPC',loanM:420,fs:0.84,gps:34,inv:8200,
+   solar:{mw:2245,installed_mw:1980,panels_pct:88,hotspots:34,inverters:224}},
+  {id:'pavagada',n:'Pavagada Solar',t:'solar',c:'India',s:'Karnataka',lat:14.09,lng:77.29,prog:100,ai:94,alert:null,funder:'KSPDCL',loanM:0,fs:0.94,gps:18,inv:9800},
+  {id:'muppandal',n:'Muppandal Wind Farm',t:'wind',c:'India',s:'Tamil Nadu',lat:8.36,lng:77.53,prog:92,ai:88,alert:null,funder:'Private',loanM:180,fs:0.89,gps:28,inv:3800},
+  {id:'kutch',n:'Kutch Wind Park',t:'wind',c:'India',s:'Gujarat',lat:23.48,lng:69.74,prog:74,ai:76,alert:'warn',funder:'ADB/GCF',loanM:280,fs:0.78,gps:41,inv:5200},
+  {id:'odisha',n:'NMDC Bailadila Mine',t:'mining',c:'India',s:'Chhattisgarh',lat:18.75,lng:81.29,prog:62,ai:74,alert:'warn',funder:'NMDC',loanM:380,fs:0.78,gps:164,inv:12000,
+   mining:{type:'Iron Ore',depth_m:185,prod_mt:10.5,dust_pm10:124,turb:82,insar_mm:-2.1}},
+  {id:'sa_gold',n:'AngloGold Ashanti',t:'mining',c:'Ghana',s:'Ashanti',lat:6.71,lng:-1.62,prog:88,ai:81,alert:null,funder:'IFC/AfDB',loanM:640,fs:0.83,gps:212,inv:18000},
+  {id:'jharkhand',n:'CCL Rajrappa Coal',t:'mining',c:'India',s:'Jharkhand',lat:23.65,lng:85.49,prog:78,ai:72,alert:'warn',funder:'CCL',loanM:220,fs:0.74,gps:98,inv:8400},
+  {id:'rrts',n:'Delhi-Meerut RRTS',t:'railway',c:'India',s:'UP/Delhi',lat:28.80,lng:77.52,prog:84,ai:86,alert:null,funder:'AIIB/ADB',loanM:1120,fs:0.88,gps:186,inv:30000,
+   railway:{km:82,laid:68,stations:22,stations_done:16,viaduct:78,tunnel:92}},
+  {id:'mahsr',n:'Mumbai-Ahmedabad HSR',t:'railway',c:'India',s:'Gujarat/Maha',lat:21.40,lng:73.20,prog:41,ai:62,alert:'warn',funder:'JICA',loanM:15800,fs:0.68,gps:488,inv:110000,
+   railway:{km:508,laid:38,stations:12,stations_done:2,viaduct:34,tunnel:8}},
+  {id:'polavaram',n:'Polavaram Dam',t:'dam',c:'India',s:'Andhra Pradesh',lat:17.25,lng:81.65,prog:82,ai:83,alert:null,funder:'CWC',loanM:0,fs:0.86,gps:68,inv:32000,
+   dam:{h:48.15,concrete:94,earthwork:78,spillway:88,gates:44,total_gates:48,insar_mm:1.8,seepage:0.4,fill_pct:42,pop:520000}},
+  {id:'vizhinjam',n:'Vizhinjam Seaport',t:'port',c:'India',s:'Kerala',lat:8.37,lng:76.98,prog:78,ai:79,alert:'warn',funder:'Adani',loanM:0,fs:0.81,gps:62,inv:11000},
+  {id:'ntpc',n:'NTPC Vindhyachal',t:'power',c:'India',s:'MP',lat:24.06,lng:82.67,prog:94,ai:91,alert:null,funder:'NTPC',loanM:0,fs:0.92,gps:28,inv:14000},
+  {id:'nairobi_rd',n:'Nairobi-Mombasa Highway',t:'road',c:'Kenya',s:'National',lat:-1.28,lng:36.82,prog:78,ai:84,alert:null,funder:'AfDB/WB',loanM:620,fs:0.86,gps:88,inv:8200},
+  {id:'ikn',n:'IKN Nusantara',t:'indpark',c:'Indonesia',s:'Kalimantan',lat:-0.86,lng:116.72,prog:41,ai:62,alert:'crit',funder:'WB/ADB/AIIB',loanM:1200,fs:0.64,gps:284,inv:32000},
+];
+
+const GPS_MACHINES={
+  dholera:[
+    {id:'CAT-001',n:'CAT D8T #001',t:'bulldozer',lat:22.234,lng:72.197,st:'active',spd:3.2,zone:'A',op:'Ramesh Kumar',act:'Active Grading',conf:94,fuel:72,hrs:1847,ping:'1 min',alert:null,col:'#F6891F',d:{active:8.2,idle:1.4,off:0.4}},
+    {id:'CAT-002',n:'CAT D8T #002',t:'bulldozer',lat:22.241,lng:72.203,st:'active',spd:2.8,zone:'A',op:'Suresh Patel',act:'Material Push',conf:91,fuel:58,hrs:2103,ping:'2 min',alert:null,col:'#F6891F',d:{active:7.8,idle:1.8,off:0.4}},
+    {id:'HIT-001',n:'Hitachi ZX870 #001',t:'excavator',lat:22.228,lng:72.188,st:'active',spd:1.1,zone:'B',op:'Vikram Singh',act:'Excavation Cycle',conf:97,fuel:84,hrs:3214,ping:'30 sec',alert:null,col:'#E53E3E',d:{active:9.2,idle:0.6,off:0.2}},
+    {id:'HIT-002',n:'Hitachi ZX870 #002',t:'excavator',lat:22.235,lng:72.195,st:'idle',spd:0,zone:'B',op:'Anwar Khan',act:'Idle — Engine On',conf:88,fuel:42,hrs:2876,ping:'3 min',alert:'idle_4h',col:'#E53E3E',d:{active:5.1,idle:4.7,off:0.2}},
+    {id:'LIB-001',n:'Liebherr LTM 1200 #001',t:'crane',lat:22.245,lng:72.211,st:'active',spd:0,zone:'F',op:'Mohan Verma',act:'Lift Operation',conf:96,fuel:91,hrs:984,ping:'1 min',alert:null,col:'#3B82F6',d:{active:10.1,idle:0.9,off:0}},
+    {id:'LIB-002',n:'Liebherr LTM 1200 #002',t:'crane',lat:22.248,lng:72.214,st:'active',spd:0,zone:'F',op:'Dinesh Reddy',act:'Lift Operation',conf:94,fuel:78,hrs:1124,ping:'2 min',alert:null,col:'#3B82F6',d:{active:9.8,idle:1.1,off:0.1}},
+    {id:'VOL-001',n:'Volvo A45G #001',t:'dumptruck',lat:22.222,lng:72.184,st:'active',spd:28.4,zone:'Transit',op:'Rajesh Mehta',act:'Material Transport',conf:99,fuel:67,hrs:4521,ping:'30 sec',alert:null,col:'#F0A500',d:{active:8.8,idle:1.0,off:0.2}},
+    {id:'VOL-002',n:'Volvo A45G #002',t:'dumptruck',lat:22.219,lng:72.179,st:'alert',spd:32.1,zone:'Outside',op:'Sunil Sharma',act:'Unauthorized Exit',conf:99,fuel:55,hrs:5102,ping:'30 sec',alert:'unauthorized_exit',col:'#E53E3E',d:{active:9.1,idle:0.7,off:0.2}},
+    {id:'CAT-PAV',n:'CAT AP1055 Paver #001',t:'paver',lat:22.257,lng:72.225,st:'active',spd:4.1,zone:'G',op:'Pradeep Nair',act:'Asphalt Laying',conf:98,fuel:62,hrs:1688,ping:'1 min',alert:null,col:'#22C55E',d:{active:10.4,idle:0.4,off:0.2}},
+    {id:'BOM-001',n:'Bomag BW226 Roller',t:'roller',lat:22.259,lng:72.228,st:'active',spd:5.2,zone:'G',op:'Santosh Kumar',act:'Compaction Zone G',conf:95,fuel:74,hrs:2341,ping:'1 min',alert:null,col:'#8B5CF6',d:{active:9.8,idle:0.9,off:0.3}},
+    {id:'JD-001',n:'JD 772 Grader #001',t:'grader',lat:22.231,lng:72.209,st:'active',spd:6.8,zone:'C',op:'Manoj Tiwari',act:'Road Grading',conf:92,fuel:28,hrs:3102,ping:'2 min',alert:'low_fuel',col:'#B45309',d:{active:8.4,idle:1.2,off:0.4}},
+    {id:'CAT-OFF',n:'CAT D6 #003',t:'bulldozer',lat:22.261,lng:72.198,st:'offline',spd:0,zone:'C',op:'Unassigned',act:'Offline 2.5h',conf:0,fuel:null,hrs:4821,ping:'2.5h ago',alert:'breakdown',col:'#2a3a4a',d:{active:5.8,idle:1.2,off:3.0}},
+  ],
+  bhadla:[
+    {id:'BHL-001',n:'Solar Panel Crane #1',t:'crane',lat:27.542,lng:71.924,st:'active',spd:0.4,zone:'A',op:'Raj Singh',act:'Panel Installation',conf:96,fuel:78,hrs:812,ping:'1 min',alert:null,col:'#3B82F6',d:{active:9,idle:1,off:0}},
+    {id:'BHL-002',n:'Maintenance Truck #1',t:'dumptruck',lat:27.546,lng:71.918,st:'active',spd:12.4,zone:'Transit',op:'Priya Sharma',act:'Cleaning Dispatch',conf:88,fuel:62,hrs:2240,ping:'2 min',alert:null,col:'#F0A500',d:{active:8,idle:1.5,off:0.5}},
+    {id:'BHL-003',n:'Access Road Grader',t:'grader',lat:27.538,lng:71.922,st:'idle',spd:0,zone:'B',op:'Suresh Nair',act:'Standby',conf:72,fuel:48,hrs:1650,ping:'5 min',alert:null,col:'#B45309',d:{active:4,idle:5.5,off:0.5}},
+  ],
+  odisha:[
+    {id:'ODI-001',n:'Komatsu PC2000 #1',t:'excavator',lat:18.753,lng:81.292,st:'active',spd:0.8,zone:'Pit-7',op:'Suresh Babu',act:'Rock Excavation',conf:97,fuel:88,hrs:4210,ping:'30 sec',alert:null,col:'#E53E3E',d:{active:10,idle:1,off:0}},
+    {id:'ODI-002',n:'Caterpillar 797F #1',t:'dumptruck',lat:18.748,lng:81.286,st:'active',spd:24.8,zone:'Haul',op:'Ramesh Rao',act:'Ore Haul — Pit to Dump',conf:99,fuel:72,hrs:8420,ping:'30 sec',alert:null,col:'#F0A500',d:{active:11,idle:0.5,off:0.5}},
+    {id:'ODI-003',n:'Caterpillar 797F #2',t:'dumptruck',lat:18.752,lng:81.289,st:'active',spd:18.2,zone:'Haul',op:'Kiran Kumar',act:'Return — Empty',conf:99,fuel:81,hrs:7240,ping:'30 sec',alert:null,col:'#F0A500',d:{active:10.5,idle:1,off:0.5}},
+    {id:'ODI-004',n:'Blast Drill Rig #1',t:'excavator',lat:18.756,lng:81.294,st:'active',spd:0,zone:'Pit-7 North',op:'Ajay Yadav',act:'Blast Hole Drilling',conf:94,fuel:68,hrs:3180,ping:'1 min',alert:null,col:'#E53E3E',d:{active:9,idle:2,off:1}},
+  ],
+  rrts:[
+    {id:'RRT-001',n:'Track Layer TLF #1',t:'paver',lat:28.824,lng:77.498,st:'active',spd:1.2,zone:'km-68',op:'ML Team',act:'Track Laying — km 68.4',conf:98,fuel:62,hrs:2840,ping:'30 sec',alert:null,col:'#22C55E',d:{active:10,idle:1,off:0}},
+    {id:'RRT-002',n:'Gantry Crane #1',t:'crane',lat:28.812,lng:77.480,st:'active',spd:0.3,zone:'Viaduct',op:'Rail Team',act:'Viaduct Girder Placement',conf:96,fuel:78,hrs:1240,ping:'1 min',alert:null,col:'#3B82F6',d:{active:9,idle:2,off:0}},
+    {id:'RRT-003',n:'Concrete Batch Truck',t:'dumptruck',lat:28.818,lng:77.489,st:'active',spd:22.4,zone:'Transit',op:'Supply',act:'Concrete Delivery',conf:99,fuel:58,hrs:3840,ping:'30 sec',alert:null,col:'#F0A500',d:{active:8,idle:2,off:1}},
+  ]
+};
+
+const FUSION_DATA={
+  dholera:{score:87,prog:79,assets:88,tranche:'Tranche 4 — 1% gap remaining',conf:'HIGH',
+    sources:[
+      {n:'Satellite (Sentinel-2)',ic:'🛰️',cls:'sc-sat',sc:.92,wt:.22,st:'live',upd:'3h ago',find:'78% physical progress. NDVI baseline stable. No boundary violations. Equipment: 86 detected.',trend:'+2'},
+      {n:'GPS Asset Tracking',ic:'📍',cls:'sc-gps',sc:.95,wt:.20,st:'live',upd:'Live',find:'88 active machines. 1 unauthorized exit alert. ML classifying 12 activity types. Night curfew breach 23:51.',trend:'+3'},
+      {n:'IoT Environmental',ic:'🌡️',cls:'sc-iot',sc:.84,wt:.10,st:'live',upd:'2 min',find:'PM2.5: 82 µg/m³ normal. Turbidity 28 NTU normal. Wind 14 km/h — crane ops safe.',trend:'+1'},
+      {n:'IoT Structural',ic:'📳',cls:'sc-iot',sc:.79,wt:.08,st:'warn',upd:'5 min',find:'Tiltmeter Bridge Pier 4 elevated at 0.08° (limit 0.1°). Strain gauges nominal.',trend:'-4'},
+      {n:'Drone Orthomosaic',ic:'🚁',cls:'sc-drone',sc:.93,wt:.15,st:'stale',upd:'4 days ago',find:'82% roads confirmed from 2cm GSD map. 1,248 precast units counted. No clearing outside boundary.',trend:'0'},
+      {n:'IP Cameras',ic:'📷',cls:'sc-cam',sc:.61,wt:.10,st:'warn',upd:'Live (3 offline)',find:'847 vehicles today. 3 cameras offline — south perimeter gap. PPE compliance 94%.',trend:'-12'},
+      {n:'Edge AI Devices',ic:'🖥️',cls:'sc-edge',sc:.88,wt:.08,st:'live',upd:'30 sec',find:'Gate AI: 0 unauthorized entries. Zone AI: 0 violations. PPE detection running.',trend:'+2'},
+      {n:'Acoustic Sensors',ic:'🎙️',cls:'sc-acou',sc:.76,wt:.05,st:'live',upd:'8 min',find:'Normal activity. No blast events. Night sound anomaly 01:22 — unidentified vehicle correlated with GPS alert.',trend:'+1'},
+      {n:'Physical Inspection',ic:'👷',cls:'sc-phys',sc:.91,wt:.02,st:'stale',upd:'12 days ago',find:'Phase 2 roads milestone confirmed. Equipment count matched. Minor snagging noted in Zone C.',trend:'0'},
+    ]
+  },
+  bhadla:{score:84,prog:88,assets:34,tranche:'Tranche 3 — conditions met',conf:'HIGH',
+    sources:[
+      {n:'Satellite (Planet 3m)',ic:'🛰️',cls:'sc-sat',sc:.93,wt:.30,st:'live',upd:'1 day ago',find:'88% panel coverage confirmed. 34 thermal hotspots. ECOSTRESS TIR scan: 1.2% degraded panels. Capacity: 1,980 MW.'},
+      {n:'GPS Assets',ic:'📍',cls:'sc-gps',sc:.88,wt:.15,st:'live',upd:'Live',find:'24 active. All within boundary. Night curfew compliant.'},
+      {n:'IoT Env',ic:'🌡️',cls:'sc-iot',sc:.94,wt:.15,st:'live',upd:'1 min',find:'Irradiance: 842 W/m². Wind: 8.4 m/s. Soiling: 2.1%. No dust storm.'},
+      {n:'Drone Thermal',ic:'🚁',cls:'sc-drone',sc:.96,wt:.20,st:'live',upd:'2 days ago',find:'FLIR thermal complete. 34 hotspot panels flagged for maintenance.'},
+      {n:'Cameras',ic:'📷',cls:'sc-cam',sc:.84,wt:.12,st:'live',upd:'Live',find:'All 12 online. No perimeter breaches.'},
+      {n:'Edge AI',ic:'🖥️',cls:'sc-edge',sc:.82,wt:.06,st:'live',upd:'1 min',find:'Panel cleaning AI dispatched 34 maintenance requests.'},
+      {n:'Acoustic',ic:'🎙️',cls:'sc-acou',sc:.71,wt:.02,st:'live',upd:'15 min',find:'Normal activity.'},
+    ]
+  }
+};
+
+const CERTS=[
+  {id:'IG-2026-0842',park:'AURIC',type:'Phase 1 Operational — ADB Tranche 4',date:'15 Mar 2026',hash:'0x4a7f2b9c…e8c3d1f4',chain:'Hyperledger Fabric'},
+  {id:'IG-2026-0841',park:'Bhadla Solar',type:'Phase 3 Panels 85% — Tranche 3',date:'18 Mar 2026',hash:'0x9b2e1a4d…c4f7d2a1',chain:'Hyperledger Fabric'},
+  {id:'IG-2026-0840',park:'RRTS Delhi',type:'Viaduct 68km Complete',date:'14 Mar 2026',hash:'0x3c8d4ef1…a1b9f3e2',chain:'Hyperledger Fabric'},
+  {id:'IG-2026-0839',park:'Nairobi Highway',type:'Q4 2025 Progress 78%',date:'28 Feb 2026',hash:'0x7f1a3c8b…d2e8b4c5',chain:'Hyperledger Fabric'},
+];
+
+const ALERTS_DATA=[
+  {lv:'crit',park:'Krishnapatnam',title:'MoEF Stage II Clearance Lapsed — Tranche Blocked',time:'2 days ago',detail:'$80M ADB Tranche 3 blocked.'},
+  {lv:'crit',park:'IKN Kalimantan',title:'AI+Drone: 2.8 ha Excess Deforestation — AMDAL Boundary',time:'2 days ago',detail:'YOLOv8 + change detection confirms 2.8 ha clearing in buffer.'},
+  {lv:'warn',park:'Dholera SIR',title:'GPS VOL-002: Unauthorized Exit Gate 3 — 23:51 Loaded',time:'20 Mar 2026',detail:'ML pattern: potential material theft. SAR confirms loaded truck signature.'},
+  {lv:'warn',park:'Bhadla Solar',title:'34 Thermal Hotspot Panels — ECOSTRESS + Drone FLIR',time:'19 Mar 2026',detail:'1.2% efficiency loss. Maintenance dispatched.'},
+  {lv:'warn',park:'Krishnapatnam',title:'Turbidity Spike — 340 NTU (Limit 50 NTU) — Wetland Buffer',time:'18 Mar 2026',detail:'IoT water sensor corroborated by SAR turbidity model.'},
+  {lv:'info',park:'AURIC',title:'ADB Tranche 4 — $120M Released via Blockchain Cert',time:'15 Mar 2026',detail:'Certificate IG-2026-0842 issued.'},
+  {lv:'info',park:'Polavaram Dam',title:'InSAR: Dam Body 1.8mm — Within Safe Limit (5mm threshold)',time:'21 Mar 2026',detail:'Sentinel-1 6-day repeat. Status: SAFE NORMAL.'},
+];
+
+const SAT_SCHEDULE=[
+  {sat:'Sentinel-2',proj:'Dholera SIR',time:'13:47 UTC',res:'10m',cloud:'15%',st:'upcoming'},
+  {sat:'Sentinel-1 SAR',proj:'Krishnapatnam',time:'17:22 UTC',res:'10m IW',cloud:'N/A',st:'upcoming'},
+  {sat:'Planet 3m',proj:'Bhadla Solar',time:'06:18 UTC',res:'3m',cloud:'0%',st:'done'},
+  {sat:'ECOSTRESS TIR',proj:'Bhadla Thermal',time:'03:30 UTC',res:'70m',cloud:'N/A',st:'done'},
+  {sat:'Landsat 9 TIRS',proj:'Dholera Night TIR',time:'22:54 UTC',res:'100m',cloud:'8%',st:'upcoming'},
+];
+
+const LIVE_FEED=[
+  {t:'09:41',c:'#F6891F',m:'GPS Alert — VOL-002 unauthorized exit Gate 3 loaded · Dholera SIR'},
+  {t:'09:38',c:'#A78BFA',m:'Acoustic — Blast event 142 dB · Odisha Mine Zone 7 (Scheduled)'},
+  {t:'09:35',c:'#00D68F',m:'Satellite — Planet pass complete · Bhadla Solar · 0% cloud · 34 hotspots'},
+  {t:'09:30',c:'#F59E0B',m:'Edge AI — 847 vehicles Gate 1 · PPE 94% · 0 intrusions · Dholera'},
+  {t:'09:22',c:'#38BDF8',m:'IoT Alert — Turbidity 340 NTU spike · Krishnapatnam wetland buffer'},
+  {t:'09:15',c:'#EF4444',m:'Drone DM-0843 launched · RRTS corridor survey · ETA 45min'},
+  {t:'09:08',c:'#00D68F',m:'InSAR pass complete · Polavaram Dam · Max displacement 1.8mm · SAFE'},
+  {t:'08:54',c:'#F6891F',m:'GPS — 88 active machines · Dholera SIR · Fleet efficiency 84%'},
+  {t:'08:47',c:'#F59E0B',m:'Edge AI — Intrusion attempt detected Zone B · Alert sent · Dholera'},
+  {t:'08:30',c:'#38BDF8',m:'IoT — Seepage 0.4 L/s monitored · Polavaram Dam downstream'},
+];
+
+const IOT_SENSORS={
+  air:[
+    {ic:'🌬️',n:'Air Quality — Gate A',v:'PM2.5: 82 µg/m³',lim:'< 150',st:'normal',site:'Dholera'},
+    {ic:'⚠️',n:'Crusher Zone Dust',v:'PM10: 124 µg/m³',lim:'< 150',st:'warn',site:'Dholera'},
+    {ic:'😷',n:'Silica — Excavation',v:'0.08 mg/m³',lim:'< 0.1',st:'warn',site:'Dholera'},
+    {ic:'🌬️',n:'Air Quality — Krishna',v:'PM2.5: 48 µg/m³',lim:'< 150',st:'normal',site:'Krishnapatnam'},
+  ],
+  water:[
+    {ic:'🚨',n:'Wetland Turbidity',v:'340 NTU',lim:'< 50',st:'crit',site:'Krishnapatnam'},
+    {ic:'💧',n:'Site Runoff',v:'28 NTU',lim:'< 50',st:'normal',site:'Dholera'},
+    {ic:'🧪',n:'pH — East Body',v:'pH 6.8',lim:'6.5–8.5',st:'normal',site:'Dholera'},
+    {ic:'⚠️',n:'Arsenic — Mine Runoff',v:'As: 0.048 mg/L',lim:'< 0.05',st:'warn',site:'Odisha'},
+  ],
+  struct:[
+    {ic:'📐',n:'Tiltmeter — Bridge Pier 4',v:'0.08°',lim:'< 0.1°',st:'warn',site:'Dholera'},
+    {ic:'📏',n:'Strain Gauge — Span B7',v:'182 MPa',lim:'< 250',st:'normal',site:'Dholera'},
+    {ic:'💦',n:'Seepage — Dam Downstream',v:'0.4 L/s',lim:'< 0.5',st:'warn',site:'Polavaram'},
+    {ic:'💧',n:'Piezometer — Dam Core',v:'Uplift 1.2m',lim:'< 2.0m',st:'normal',site:'Polavaram'},
+  ]
+};
+
+const EDGE_DEVS=[
+  {id:'JET-001',n:'NVIDIA Jetson Orin',loc:'Gate 1 — Dholera',type:'Vehicle + LPR AI',st:'processing',cpu:84,ev:847,model:'YOLOv8n + PaddleOCR',up:42},
+  {id:'JET-002',n:'NVIDIA Jetson Orin',loc:'Gate 3 — Dholera',type:'Entry/Exit AI',st:'online',cpu:62,ev:412,model:'YOLOv8n',up:38},
+  {id:'JET-003',n:'NVIDIA Jetson AGX',loc:'Zone B Perimeter',type:'Intrusion + PPE AI',st:'processing',cpu:91,ev:34,model:'YOLOv8m + PPE',up:28},
+  {id:'GRN-001',n:'AWS Greengrass Hub',loc:'Dholera Site Office',type:'IoT + ML Gateway',st:'online',cpu:34,ev:18847,model:'Isolation Forest',up:112},
+  {id:'JET-004',n:'NVIDIA Jetson Nano',loc:'Crusher — Odisha Mine',type:'Dust + Safety AI',st:'processing',cpu:78,ev:224,model:'Custom dust',up:18},
+  {id:'ADV-001',n:'Advantech MIC-720',loc:'Polavaram Dam Control',type:'Structural Monitor',st:'online',cpu:28,ev:2847,model:'LSTM anomaly',up:84},
+];
+
+const DRONES=[
+  {id:'DM-0847',park:'Dholera',date:'20 Mar',type:'Orthomosaic + LiDAR',drone:'DJI M350 RTK',gsd:'2cm',ha:4847,st:'processed',find:'82% roads. 1,248 precast units. No unauthorized clearing.'},
+  {id:'DM-0846',park:'Bhadla Solar',date:'19 Mar',type:'Thermal FLIR',drone:'DJI M350 FLIR',gsd:'5cm thermal',ha:5700,st:'processed',find:'34 hotspot panels. String 18-C offline. 99.98% health.'},
+  {id:'DM-0845',park:'Odisha Mine',date:'18 Mar',type:'Pit Volume Survey',drone:'Fixed-Wing VTOL',gsd:'5cm',ha:4200,st:'processed',find:'890MT extracted. Spoil heap +12MT. Roads 78%.'},
+  {id:'DM-0844',park:'Polavaram Dam',date:'17 Mar',type:'Dam Face Inspection',drone:'DJI M300 Zenmuse',gsd:'1cm',ha:180,st:'processed',find:'No cracks. Spillway seals intact. 2 minor spalls noted.'},
+  {id:'DM-0843',park:'RRTS Delhi',date:'21 Mar',type:'Corridor Progress',drone:'Fixed-Wing',gsd:'5cm',ha:820,st:'in-flight',find:'Mission in progress…'},
+];
+
+const CAMERAS=[
+  {id:'CAM-001',n:'Gate 1 Entry',loc:'Dholera Gate 1',type:'PTZ + LPR',st:'live',ai:'Vehicle + LPR',ev:847},
+  {id:'CAM-002',n:'Zone B Perimeter',loc:'Dholera Zone B',type:'Fixed CCTV',st:'live',ai:'Intrusion',ev:12},
+  {id:'CAM-003',n:'Wetland Buffer',loc:'Krishnapatnam',type:'Thermal Night',st:'offline',ai:'Offline',ev:0},
+  {id:'CAM-004',n:'Spillway Camera',loc:'Polavaram',type:'4K Fixed',st:'live',ai:'Water level',ev:2},
+  {id:'CAM-005',n:'Solar Field Cam 1',loc:'Bhadla Sector A',type:'PTZ Pan',st:'live',ai:'Panel inspect',ev:4},
+  {id:'CAM-006',n:'Mine Pit Camera',loc:'Odisha Pit',type:'Wide 4K',st:'live',ai:'Slope stability',ev:18},
+];
+</script>
+<script>
+// ═══════════════════════════════════════════
+// CORE — LOGIN + PORTAL SWITCHING
+// ═══════════════════════════════════════════
+let userRole=null;
+const _maps={};let _gpsMarkers={};let _gpsInterval=null;let _selMachine=null;
+let _satBand='ndvi';let _detOn=true;let _splitDragging=false;
+
+function login(role){
+  userRole=role;
+  const rc=ROLE_CONFIG[role];
+  document.getElementById('login-screen').classList.add('hidden');
+  const nav=document.getElementById('main-nav');
+  nav.style.display='flex';
+  document.getElementById('user-name').textContent=rc.name;
+  document.getElementById('user-dot').style.background=rc.color;
+  // Show/hide nav buttons based on role
+  ['gov','gps','sat','fusion','dfi','field','inv','ins'].forEach(p=>{
+    const btn=document.getElementById('nav-'+p);
+    if(btn){if(rc.portals.includes(p)){btn.classList.remove('locked');}else{btn.classList.add('locked');}}
+  });
+  // Auto-open first accessible portal
+  const first=rc.portals[0];
+  showPortal(first);
+  document.getElementById('nav-'+first)?.classList.add('active');
+  startClock();
+}
+
+function logout(){
+  userRole=null;
+  document.getElementById('login-screen').classList.remove('hidden');
+  document.getElementById('main-nav').style.display='none';
+  document.querySelectorAll('.portal').forEach(p=>p.classList.remove('active'));
+  clearInterval(_gpsInterval);_gpsInterval=null;
+}
+
+function showPortal(id,skipLock){
+  if(!skipLock&&userRole&&!ROLE_CONFIG[userRole].portals.includes(id))return;
+  document.querySelectorAll('.portal').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  const p=document.getElementById('portal-'+id);
+  if(p)p.classList.add('active');
+  const btn=document.getElementById('nav-'+id);
+  if(btn)btn.classList.add('active');
+  const inits={gov:initGov,gps:initGPS,sat:initSAT,fusion:initFusion,dfi:initDFI,field:initField,inv:initInv,ins:initIns};
+  const key='_init_'+id;
+  if(!window[key]&&inits[id]){inits[id]();window[key]=true;}
+  setTimeout(()=>Object.values(_maps).forEach(m=>{try{m.invalidateSize();}catch(e){}}),150);
+}
+
+function startClock(){
+  let sec=4*3600+18*60;
+  setInterval(()=>{sec--;if(sec<0)sec=86400;const h=Math.floor(sec/3600),m=Math.floor((sec%3600)/60);document.getElementById('sat-countdown').textContent=(h>0?h+'h ':'')+m+'m';},1000);
+}
+
+function closeModal(){document.getElementById('proj-modal').classList.remove('open');}
+
+// ═══════════════════════════════════════════
+// CANVAS UTILS — SATELLITE IMAGERY SIMULATION
+// ═══════════════════════════════════════════
+function noise2D(x,y,s=0.15){return(Math.sin(x*s*1.2+0.3)*Math.cos(y*s*.9+0.7)+Math.sin(x*s*.7+y*s*.8)*.5)*.5+.5;}
+function lerp(a,b,t){return a+(b-a)*t;}
+function ndviColor(v){
+  if(v<-0.1)return[20,60,140];         // water — blue
+  if(v<0.05)return[110,75,40];          // bare soil — brown
+  if(v<0.15)return[160,130,60];         // sparse — tan
+  if(v<0.3)return[140,170,60];          // open ground — yellow-green
+  if(v<0.5)return[70,150,50];           // moderate — green
+  if(v<0.7)return[30,120,30];           // dense — dark green
+  return[10,70,15];                      // very dense — deep forest
+}
+function sarColor(v){const g=Math.round(v*220);return[g,g,g];}
+function swirColor(v,channel){
+  if(channel==='iron')return[Math.round(200*v),Math.round(80*v),Math.round(20*v)];
+  if(channel==='clay')return[Math.round(180*v),Math.round(160*v),Math.round(40*v)];
+  if(channel==='water')return[Math.round(10+30*v),Math.round(50+100*v),Math.round(150+100*v)];
+  return[Math.round(100+100*v),Math.round(80+100*v),Math.round(60+100*v)];
+}
+
+function drawSatScene(canvas,type,progress,band){
+  if(!canvas)return;
+  const W=canvas.width=canvas.offsetWidth||600,H=canvas.height=canvas.offsetHeight||280;
+  const ctx=canvas.getContext('2d');
+  const cellSz=3;
+  for(let y=0;y<H;y+=cellSz){
+    for(let x=0;x<W;x+=cellSz){
+      const px=x/W,py=y/H;
+      const n=noise2D(x,y,0.08);
+      let col;
+      if(band==='ndvi'){
+        let ndvi=0;
+        if(type==='dholera'){
+          // Construction zone clearing progresses left to right
+          const inConstruction=px<progress*0.85&&Math.abs(py-.5)<.4;
+          const isRoad=Math.abs(py-.5)<.05||Math.abs(py-.3)<.04;
+          if(isRoad)ndvi=-0.02+n*.02;
+          else if(inConstruction)ndvi=0.05+n*.1;
+          else ndvi=0.55+n*.25;
+        }else if(type==='bhadla'){
+          // Solar panels — very low NDVI
+          const isPanel=px<progress*.95&&((Math.floor(py*20)%2===0&&Math.floor(px*40)%3!==0));
+          ndvi=isPanel?-0.05+n*.05:0.3+n*.2;
+        }else if(type==='mahsr'){
+          // Railway corridor — thin strip
+          const inCorridor=Math.abs(py-.5)<.08;
+          const laid=px<progress*.9&&inCorridor;
+          if(laid)ndvi=-0.03+n*.02;
+          else if(inCorridor)ndvi=0.1+n*.1;
+          else ndvi=0.5+n*.3;
+        }else if(type==='polavaram'){
+          // Dam — curved embankment
+          const isBankment=Math.abs(py-.5)<.15&&Math.abs(px-.5)<.3;
+          const isReservoir=px<.4&&py<.4;
+          if(isReservoir)ndvi=-0.2+n*.05;
+          else if(isBankment)ndvi=0.1*progress+n*.1;
+          else ndvi=0.45+n*.3;
+        }else if(type==='odisha'){
+          // Mining pit — irregular dark zone
+          const inPit=Math.sqrt((px-.4)**2+(py-.5)**2)<.25;
+          const isSpoil=Math.sqrt((px-.7)**2+(py-.3)**2)<.15;
+          if(inPit)ndvi=-0.05+n*.05;
+          else if(isSpoil)ndvi=0.05+n*.05;
+          else ndvi=0.45+n*.25;
+        }else{ndvi=0.4+n*.3;}
+        col=ndviColor(ndvi);
+      }else if(band==='sar'){
+        // SAR backscatter — construction=bright
+        let bk=0;
+        if(type==='dholera'){const c=px<progress*.85&&Math.abs(py-.5)<.4;bk=c?0.5+n*.4:0.2+n*.2;}
+        else bk=0.3+n*.3;
+        col=sarColor(bk);
+      }else if(band==='rgb'){
+        // Simulated true-color
+        const r=Math.round(30+n*80),g=Math.round(50+n*100),b=Math.round(20+n*60);
+        col=[r,g,b];
+      }else if(band==='swir'){
+        const s=noise2D(x,y,0.12);
+        col=swirColor(s,type==='odisha'?'iron':type==='dholera'?'clay':'water');
+      }else{col=[40,80,40];}
+      ctx.fillStyle=`rgb(${col[0]},${col[1]},${col[2]})`;
+      ctx.fillRect(x,y,cellSz,cellSz);
+    }
+  }
+  // Add slight vignette
+  const vg=ctx.createRadialGradient(W/2,H/2,H*.3,W/2,H/2,H*.8);
+  vg.addColorStop(0,'rgba(0,0,0,0)');vg.addColorStop(1,'rgba(0,0,0,.25)');
+  ctx.fillStyle=vg;ctx.fillRect(0,0,W,H);
+}
+
+function drawDetectionBoxes(canvas,machines){
+  if(!canvas)return;
+  const W=canvas.width=canvas.offsetWidth||600,H=canvas.height=canvas.offsetHeight||280;
+  const ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+  if(!_detOn)return;
+  const detections=[
+    {x:.12,y:.35,w:.07,h:.05,cls:'Bulldozer',conf:.94,col:'#F6891F'},
+    {x:.22,y:.42,w:.06,h:.05,cls:'Bulldozer',conf:.91,col:'#F6891F'},
+    {x:.08,y:.52,w:.08,h:.06,cls:'Excavator',conf:.97,col:'#E53E3E'},
+    {x:.18,y:.44,w:.06,h:.05,cls:'Excavator',conf:.88,col:'#E53E3E'},
+    {x:.35,y:.38,w:.05,h:.09,cls:'Crane',conf:.96,col:'#3B82F6'},
+    {x:.38,y:.36,w:.05,h:.10,cls:'Crane',conf:.94,col:'#3B82F6'},
+    {x:.06,y:.62,w:.06,h:.04,cls:'Dump Truck',conf:.99,col:'#F0A500'},
+    {x:.13,y:.64,w:.06,h:.04,cls:'Dump Truck',conf:.99,col:'#F0A500'},
+    {x:.48,y:.44,w:.07,h:.04,cls:'Paver',conf:.98,col:'#22C55E'},
+    {x:.50,y:.40,w:.06,h:.04,cls:'Roller',conf:.95,col:'#8B5CF6'},
+    {x:.24,y:.56,w:.07,h:.04,cls:'Grader',conf:.92,col:'#B45309'},
+    {x:.28,y:.65,w:.05,h:.05,cls:'Light Vehicle',conf:.84,col:'#A78BFA'},
+    {x:.40,y:.66,w:.05,h:.04,cls:'Light Vehicle',conf:.82,col:'#A78BFA'},
+    {x:.55,y:.58,w:.06,h:.04,cls:'Dump Truck',conf:.96,col:'#F0A500'},
+  ];
+  detections.forEach(d=>{
+    const bx=d.x*W,by=d.y*H,bw=d.w*W,bh=d.h*H;
+    ctx.strokeStyle=d.col;ctx.lineWidth=2;ctx.strokeRect(bx,by,bw,bh);
+    // Corner marks
+    const cs=8;ctx.fillStyle=d.col;
+    [[bx,by],[bx+bw-cs,by],[bx,by+bh-cs],[bx+bw-cs,by+bh-cs]].forEach(([cx,cy])=>ctx.fillRect(cx,cy,cs,2));
+    [[bx,by],[bx+bw,by],[bx,by+bh],[bx+bw,by+bh]].forEach(([cx,cy])=>ctx.fillRect(cx-1,cy,2,cs));
+    // Label
+    ctx.fillStyle='rgba(0,0,0,.75)';ctx.fillRect(bx,by-14,bw,14);
+    ctx.fillStyle=d.col;ctx.font='7px monospace';ctx.fillText(`${d.cls} ${(d.conf*100).toFixed(0)}%`,bx+2,by-4);
+  });
+  document.getElementById('det-count-text').textContent=`${detections.length} detections: ${[...new Set(detections.map(d=>d.cls))].join(', ')}`;
+}
+
+function drawDeforestScene(canvas,pct){
+  if(!canvas)return;
+  const W=canvas.width=canvas.offsetWidth||600,H=canvas.height=canvas.offsetHeight||300;
+  const ctx=canvas.getContext('2d');
+  for(let y=0;y<H;y+=3){
+    for(let x=0;x<W;x+=3){
+      const px=x/W,py=y/H;
+      const n=noise2D(x,y,0.06);
+      // Forest clearing spreads from corners
+      const cleared=noise2D(x,y,0.04)>(1-pct*.8)&&px<.7;
+      // Project boundary violation
+      const violation=px>.2&&px<.45&&py>.3&&py<.7&&noise2D(x,y,0.03)>0.6;
+      let ndvi;
+      if(violation)ndvi=0.05+n*.05;
+      else if(cleared)ndvi=0.08+n*.12;
+      else ndvi=0.55+n*.35;
+      const col=ndviColor(ndvi);
+      ctx.fillStyle=`rgb(${col[0]},${col[1]},${col[2]})`;
+      ctx.fillRect(x,y,3,3);
+    }
+  }
+  // Alert zone overlay
+  ctx.strokeStyle='rgba(229,62,62,.7)';ctx.lineWidth=2;ctx.setLineDash([5,3]);
+  ctx.strokeRect(W*.2,H*.3,W*.25,H*.4);
+  ctx.setLineDash([]);
+  ctx.fillStyle='rgba(229,62,62,.15)';ctx.fillRect(W*.2,H*.3,W*.25,H*.4);
+  ctx.fillStyle='rgba(229,62,62,.9)';ctx.font='bold 9px sans-serif';
+  ctx.fillText('🚨 CLEARING ALERT 2.8ha',W*.21,H*.32);
+}
+
+function drawResourceScene(canvas,mode){
+  if(!canvas)return;
+  const W=canvas.width=canvas.offsetWidth||600,H=canvas.height=canvas.offsetHeight||280;
+  const ctx=canvas.getContext('2d');
+  for(let y=0;y<H;y+=3){
+    for(let x=0;x<W;x+=3){
+      const px=x/W,py=y/H;
+      let col;
+      if(mode==='mineral'){
+        const s=noise2D(x,y,0.1),s2=noise2D(x+50,y,0.08);
+        const ironZone=Math.sqrt((px-.3)**2+(py-.4)**2)<.2&&s>.4;
+        const clayZone=Math.sqrt((px-.7)**2+(py-.6)**2)<.18&&s2>.45;
+        if(ironZone)col=[180+s*40,60,20];
+        else if(clayZone)col=[160+s*40,140,40];
+        else{const g=Math.round(30+s*60);col=[g+10,g+20,g-10];}
+      }else if(mode==='water'){
+        const isWater=noise2D(x,y,0.05)>.55&&px>.1&&px<.8;
+        if(isWater)col=[10,50+noise2D(x,y,.1)*80,150+noise2D(x,y,.08)*80];
+        else{const g=Math.round(60+noise2D(x,y,.08)*80);col=[g+5,g+15,g];}
+      }else if(mode==='thermal'){
+        const heatspot1=Math.sqrt((px-.4)**2+(py-.45)**2)<.12;
+        const heatspot2=Math.sqrt((px-.65)**2+(py-.35)**2)<.08;
+        const temp=noise2D(x,y,0.07)*.3+(heatspot1?.7:0)+(heatspot2?.5:0);
+        const r=Math.round(Math.min(255,50+temp*200)),g=Math.round(Math.max(0,100-temp*150)),b=Math.round(Math.max(0,200-temp*250));
+        col=[r,g,b];
+      }else{// soil
+        const savi=noise2D(x,y,0.1);
+        if(savi<.3)col=[120,80,30];else if(savi<.6)col=[140,120,50];else col=[80,140,60];
+      }
+      ctx.fillStyle=`rgb(${col[0]},${col[1]},${col[2]})`;
+      ctx.fillRect(x,y,3,3);
+    }
+  }
+}
+
+function drawInSARScene(canvas){
+  if(!canvas)return;
+  const W=canvas.width=canvas.offsetWidth||600,H=canvas.height=canvas.offsetHeight||280;
+  const ctx=canvas.getContext('2d');
+  for(let y=0;y<H;y+=3){
+    for(let x=0;x<W;x+=3){
+      const px=x/W,py=y/H;
+      // Interferometric fringes — concentric rings of color
+      const dist=Math.sqrt((px-.5)**2+(py-.5)**2);
+      const phase=(dist*12+noise2D(x,y,.08)*.5)%1;
+      const hue=phase*240;// blue to green to yellow to red
+      ctx.fillStyle=`hsl(${hue},70%,${30+noise2D(x,y,.15)*20}%)`;
+      ctx.fillRect(x,y,3,3);
+    }
+  }
+  // Dam outline
+  ctx.strokeStyle='rgba(255,255,255,.4)';ctx.lineWidth=3;
+  ctx.beginPath();ctx.moveTo(W*.1,H*.45);ctx.lineTo(W*.5,H*.38);ctx.lineTo(W*.9,H*.45);ctx.stroke();
+  // Deformation hotspot
+  ctx.strokeStyle='rgba(229,62,62,.8)';ctx.lineWidth=2;ctx.setLineDash([3,3]);
+  ctx.beginPath();ctx.arc(W*.5,H*.44,30,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle='rgba(229,62,62,.85)';ctx.font='bold 9px sans-serif';
+  ctx.fillText('Max: 1.8mm',W*.5-28,H*.44-35);
+}
+
+function drawLinearScene(canvas,type,progress){
+  if(!canvas)return;
+  const W=canvas.width=canvas.offsetWidth||600,H=canvas.height=canvas.offsetHeight||240;
+  const ctx=canvas.getContext('2d');
+  for(let y=0;y<H;y+=3){
+    for(let x=0;x<W;x+=3){
+      const px=x/W,py=y/H,n=noise2D(x,y,0.08);
+      const inCorridor=Math.abs(py-.5)<.15;
+      const laid=px<progress*.9&&inCorridor;
+      const earthwork=px<(progress+.1)*.9&&inCorridor&&!laid;
+      let ndvi;
+      if(laid)ndvi=-0.02+n*.02;
+      else if(earthwork)ndvi=0.1+n*.1;
+      else if(inCorridor)ndvi=0.25+n*.15;
+      else ndvi=0.5+n*.3;
+      ctx.fillStyle=`rgb(${ndviColor(ndvi).join(',')})`;
+      ctx.fillRect(x,y,3,3);
+    }
+  }
+  // Machine location
+  const mx=progress*.9*W;
+  ctx.fillStyle='rgba(0,214,143,.9)';ctx.font='16px sans-serif';
+  ctx.fillText('🚂',mx-8,H*.5+8);
+}
+
+function drawVehicleDetectionScene(canvas){
+  if(!canvas)return;
+  const W=canvas.width=canvas.offsetWidth||600,H=canvas.height=canvas.offsetHeight||340;
+  const ctx=canvas.getContext('2d');
+  // Simulate Planet 3m false color composite
+  for(let y=0;y<H;y+=2){
+    for(let x=0;x<W;x+=2){
+      const px=x/W,py=y/H,n=noise2D(x,y,0.12);
+      const isRoad=Math.abs(py-.5)<.03||Math.abs(px-.3)<.03;
+      const isBare=px>.1&&px<.9&&py>.2&&py<.8&&noise2D(x,y,0.05)>.4;
+      let col;
+      if(isRoad)col=[45,45,45];
+      else if(isBare)col=[Math.round(140+n*60),Math.round(110+n*50),Math.round(80+n*40)];
+      else col=[Math.round(40+n*60),Math.round(90+n*80),Math.round(30+n*40)];
+      ctx.fillStyle=`rgb(${col.join(',')})`;
+      ctx.fillRect(x,y,2,2);
+    }
+  }
+}
+
+function drawVehicleDetBoxes(canvas){
+  if(!canvas)return;
+  const W=canvas.width=canvas.offsetWidth||600,H=canvas.height=canvas.offsetHeight||340;
+  const ctx=canvas.getContext('2d');ctx.clearRect(0,0,W,H);
+  const dets=[
+    {x:.08,y:.35,w:.04,h:.05,cls:'Excavator',c:'#E53E3E',conf:.97},{x:.18,y:.48,w:.04,h:.05,cls:'Excavator',c:'#E53E3E',conf:.88},
+    {x:.12,y:.55,w:.05,h:.04,cls:'Bulldozer',c:'#F6891F',conf:.94},{x:.24,y:.38,w:.05,h:.04,cls:'Bulldozer',c:'#F6891F',conf:.91},
+    {x:.32,y:.44,w:.06,h:.04,cls:'Dump Truck',c:'#F0A500',conf:.99},{x:.42,y:.52,w:.06,h:.04,cls:'Dump Truck',c:'#F0A500',conf:.97},{x:.38,y:.62,w:.06,h:.04,cls:'Dump Truck',c:'#F0A500',conf:.96},
+    {x:.52,y:.38,w:.04,h:.09,cls:'Tower Crane',c:'#38BDF8',conf:.96},{x:.56,y:.36,w:.04,h:.10,cls:'Tower Crane',c:'#38BDF8',conf:.94},
+    {x:.62,y:.46,w:.05,h:.04,cls:'Paver',c:'#22C55E',conf:.98},{x:.66,y:.55,w:.05,h:.04,cls:'Roller',c:'#8B5CF6',conf:.95},
+    {x:.74,y:.42,w:.04,h:.03,cls:'Light Veh',c:'#A78BFA',conf:.84},{x:.78,y:.52,w:.04,h:.03,cls:'Light Veh',c:'#A78BFA',conf:.82},
+    {x:.82,y:.44,w:.05,h:.04,cls:'Dump Truck',c:'#F0A500',conf:.95},
+  ];
+  dets.forEach(d=>{
+    const bx=d.x*W,by=d.y*H,bw=d.w*W,bh=d.h*H;
+    ctx.strokeStyle=d.c;ctx.lineWidth=1.5;ctx.strokeRect(bx,by,bw,bh);
+    ctx.fillStyle='rgba(0,0,0,.8)';ctx.fillRect(bx,by-12,bw,12);
+    ctx.fillStyle=d.c;ctx.font='7px monospace';ctx.fillText(`${d.cls} ${(d.conf*100).toFixed(0)}%`,bx+2,by-3);
+  });
+  const counts={};dets.forEach(d=>counts[d.cls]=(counts[d.cls]||0)+1);
+  document.getElementById('vdet-counts').innerHTML=Object.entries(counts).map(([k,v])=>`${v}× ${k}`).join(' · ');
+}
+
+function drawChangeMaps(splitContainer){
+  const before=document.getElementById('split-before-canvas');
+  const after=document.getElementById('split-after-canvas');
+  if(!before||!after)return;
+  const W=splitContainer.offsetWidth||600,H=300;
+  before.width=W;before.height=H;before.style.width=W/2+'px';before.style.height=H+'px';
+  after.width=W;after.height=H;after.style.width=W/2+'px';after.style.height=H+'px';
+  const bctx=before.getContext('2d'),actx=after.getContext('2d');
+  for(let y=0;y<H;y+=3){
+    for(let x=0;x<W;x+=3){
+      const px=x/W,py=y/H,n=noise2D(x,y,0.08);
+      const ndviBefore=0.55+n*.35;
+      const inConstr=px>.1&&px<.7&&py>.2&&py<.8&&noise2D(x,y,0.05)>.5;
+      const ndviAfter=inConstr?0.05+n*.1:ndviBefore;
+      bctx.fillStyle=`rgb(${ndviColor(ndviBefore).join(',')})`;bctx.fillRect(x,y,3,3);
+      actx.fillStyle=`rgb(${ndviColor(ndviAfter).join(',')})`;actx.fillRect(x,y,3,3);
+    }
+  }
+}
+
+function drawChangeHeatmap(canvas){
+  if(!canvas)return;
+  const W=canvas.width=canvas.offsetWidth||600,H=canvas.height=canvas.offsetHeight||160;
+  const ctx=canvas.getContext('2d');
+  for(let y=0;y<H;y+=3){
+    for(let x=0;x<W;x+=3){
+      const px=x/W,py=y/H,n=noise2D(x,y,0.07);
+      const inConstr=px>.1&&px<.7&&py>.2&&py<.8&&noise2D(x,y,0.05)>.5;
+      let col;
+      if(inConstr&&n>.6)col=[180,50,20];// construction — red-brown
+      else if(inConstr)col=[140,70,30];
+      else if(n<.2)col=[20,60,150];// new water — blue
+      else if(n<.3)col=[30,100,30];// veg gain — green
+      else col=[15,20,30];// no change
+      ctx.fillStyle=`rgb(${col.join(',')})`;ctx.fillRect(x,y,3,3);
+    }
+  }
+}
+
+// Split-view interaction
+function initSplitView(){
+  const c=document.getElementById('split-container');
+  const div=document.getElementById('split-divider');
+  const before=document.getElementById('split-before-canvas');
+  const after=document.getElementById('split-after-canvas');
+  if(!c||!div)return;
+  drawChangeMaps(c);
+  let dragging=false;
+  const move=e=>{
+    if(!dragging)return;
+    const r=c.getBoundingClientRect();
+    const pct=Math.min(.95,Math.max(.05,(e.clientX-r.left)/r.width));
+    div.style.left=pct*100+'%';
+    if(before)before.style.width=(pct*r.width)+'px';
+    if(after){after.style.width=((1-pct)*r.width)+'px';after.style.right='0';after.style.left='auto';}
+  };
+  div.addEventListener('mousedown',e=>{dragging=true;e.preventDefault();});
+  document.addEventListener('mousemove',move);
+  document.addEventListener('mouseup',()=>dragging=false);
+}
+
+// ═══════════════════════════════════════════
+// GOV PORTAL
+// ═══════════════════════════════════════════
+let _satLayer=false;let _govMap=null;
+function initGov(){
+  renderGovCards(ALL_PROJECTS);
+  document.getElementById('gov-alerts').innerHTML=ALERTS_DATA.slice(0,5).map(alertHTML).join('');
+  document.getElementById('sat-sched').innerHTML=SAT_SCHEDULE.map(s=>`<div style="display:flex;align-items:center;gap:7px;padding:7px;background:var(--bg3);border-radius:6px;margin-bottom:4px"><span>🛰️</span><div style="flex:1"><div style="font-size:11px;font-weight:600;color:var(--white)">${s.sat} — ${s.proj}</div><div style="font-size:9px;color:var(--dgray)">${s.res} · ${s.cloud} cloud</div></div><div style="text-align:right"><div style="font-size:9px;color:var(--teal)">${s.time}</div><div style="font-size:9px;color:${s.st==='done'?'var(--mint)':'var(--gold)'}">${s.st}</div></div></div>`).join('');
+  document.getElementById('gov-feed').innerHTML=LIVE_FEED.map(f=>`<div class="feed-row"><div class="feed-time">${f.t}</div><div class="feed-dot" style="background:${f.c}"></div><div class="feed-msg">${f.m}</div></div>`).join('');
+  const types=['all','indpark','solar','wind','mining','railway','road','port','dam','power'];
+  document.getElementById('gov-type-tabs').innerHTML=types.map(t=>`<div class="type-tab ${t==='all'?'active':''}" onclick="filterType('${t}',this)" style="${t==='all'?'color:var(--white);border-color:var(--teal)':''}"><span class="tdot" style="background:${PTCOLS[t]||'var(--teal)'}"></span>${t==='all'?'All (47)':PTICONS[t]+(t.charAt(0).toUpperCase()+t.slice(1))}</div>`).join('');
+  setTimeout(()=>{
+    _govMap=L.map('gov-map',{zoomControl:true}).setView([20,78],4);
+    L.tileLayer(TMAP,{attribution:'©CARTO'}).addTo(_govMap);
+    _maps.gov=_govMap;
+    ALL_PROJECTS.forEach(p=>{
+      const col=p.alert==='crit'?'#E53E3E':p.alert==='warn'?'#F6891F':PTCOLS[p.t]||'#00D68F';
+      const ic=L.divIcon({className:'',html:`<div style="width:10px;height:10px;background:${col};border:2px solid ${col};border-radius:50%;box-shadow:0 0 8px ${col}80;cursor:pointer"></div>`,iconSize:[10,10],iconAnchor:[5,5]});
+      L.marker([p.lat,p.lng],{icon:ic}).addTo(_govMap).bindPopup(`<strong>${PTICONS[p.t]||'🏗️'} ${p.n}</strong><br>${p.c}·${p.s}<br>Progress: <b>${p.prog}%</b>·AI:<b>${p.ai}</b>${p.alert?`<br><span style="color:${p.alert==='crit'?'#E53E3E':'#F0A500'}">⚠ ${p.alert.toUpperCase()}</span>`:''}`);
+    });
+  },400);
+}
+
+function toggleSatLayer(){
+  _satLayer=!_satLayer;
+  if(_govMap){_govMap.eachLayer(l=>{if(l._url&&l._url.includes('arcgis'))_govMap.removeLayer(l);});
+    if(_satLayer)L.tileLayer(SATMAP).addTo(_govMap);}
+}
+
+function filterType(t,el){
+  document.querySelectorAll('.type-tab').forEach(x=>{x.classList.remove('active');x.style.color='';x.style.borderColor='';});
+  el.classList.add('active');el.style.color='var(--white)';el.style.borderColor='var(--teal)';
+  renderGovCards(t==='all'?ALL_PROJECTS:ALL_PROJECTS.filter(p=>p.t===t));
+}
+
+function renderGovCards(projects){
+  document.getElementById('gov-cards').innerHTML=projects.slice(0,9).map(p=>{
+    const col=PTCOLS[p.t]||'#00D68F';
+    const pcol=p.prog>=80?'var(--mint)':p.prog>=60?'var(--gold)':'var(--red)';
+    return `<div class="proj-card alert-${p.alert||'ok'}" onclick="openProjModal('${p.id}')">
+      <div class="pc-header"><div><div class="pc-name">${PTICONS[p.t]||'🏗️'} ${p.n}</div><div class="pc-sub">${p.c} · ${p.s||''}</div></div>
+        <span class="type-chip" style="background:${col}22;color:${col};border:1px solid ${col}44">${p.t}</span></div>
+      <div class="progress-wrap"><span style="font-size:9px;color:var(--dgray);min-width:55px">Progress</span><div class="pbar"><div class="pfill" style="width:${p.prog}%;background:${pcol}"></div></div><span class="pval">${p.prog}%</span></div>
+      <div class="pc-metrics">
+        <div class="pcm"><div class="pcm-val" style="color:${p.ai>=80?'var(--mint)':p.ai>=60?'var(--gold)':'var(--red)'}">${p.ai}</div><div class="pcm-label">AI Score</div></div>
+        <div class="pcm"><div class="pcm-val">$${(p.loanM/1000).toFixed(p.loanM>=1000?1:2)}B</div><div class="pcm-label">Loan</div></div>
+        <div class="pcm"><div class="pcm-val" style="color:var(--orange)">${p.gps||'—'}</div><div class="pcm-label">GPS Assets</div></div>
+        <div class="pcm"><div class="pcm-val" style="color:var(--purple)">${Math.round((p.fs||.8)*100)}%</div><div class="pcm-label">Fusion</div></div>
+      </div>
+      <div style="margin-top:6px;font-size:9px;color:var(--dgray)">${p.funder}${p.alert?` <span style="color:${p.alert==='crit'?'var(--red)':'var(--gold)'}">⚠ ${p.alert.toUpperCase()}</span>`:''}</div>
+    </div>`;}).join('');
+}
+
+function alertHTML(a){
+  return `<div class="alert-item ${a.lv}"><div class="ai-icon">${a.lv==='crit'?'🔴':'⚠️'}</div><div><div class="a-title">${a.title}</div><div class="a-detail">${a.park}</div><div class="a-time">${a.time}</div></div></div>`;
+}
+
+function openProjModal(id){
+  const p=ALL_PROJECTS.find(x=>x.id===id);if(!p)return;
+  const col=PTCOLS[p.t]||'#00D68F';
+  document.getElementById('modal-content').innerHTML=`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+      <span style="font-size:32px">${PTICONS[p.t]||'🏗️'}</span>
+      <div><div style="font-size:20px;font-weight:800;color:var(--white)">${p.n}</div>
+        <div style="font-size:12px;color:var(--dgray)">${p.c} · ${p.s||''} · <span class="type-chip" style="background:${col}22;color:${col};border:1px solid ${col}44">${p.t}</span></div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:16px">
+      ${[['Progress',p.prog+'%','var(--mint)'],['AI Score',p.ai,''],['GPS Assets',p.gps||'—','var(--orange)'],['Fusion',Math.round((p.fs||.8)*100)+'%','var(--purple)']].map(([l,v,c])=>`<div class="card" style="text-align:center"><div style="font-size:24px;font-weight:800;color:${c||'var(--white)'}">${v}</div><div style="font-size:10px;color:var(--dgray)">${l}</div></div>`).join('')}
+    </div>
+    ${p.metrics?`<div class="card" style="margin-bottom:12px"><div class="card-title">📊 Construction Metrics</div>${p.metrics.map(m=>`<div class="progress-wrap"><span style="font-size:10px;color:var(--dgray);min-width:80px">${m.label}</span><div class="pbar"><div class="pfill" style="width:${m.pct}%;background:${m.col}"></div></div><span class="pval">${m.pct}%</span></div>`).join('')}</div>`:''}
+    ${p.railway?`<div class="card" style="margin-bottom:12px"><div class="card-title">🚄 Railway Progress</div>
+      <div class="g2">${[['Total Corridor',p.railway.km+' km'],['Track Laid',p.railway.laid+' km'],['Stations Complete',p.railway.stations_done+'/'+p.railway.stations],['Viaduct',p.railway.viaduct+'%'],['Tunnel',p.railway.tunnel+'%']].map(([k,v])=>`<div class="kv-row"><span class="kv-key">${k}</span><span class="kv-val mint">${v}</span></div>`).join('')}</div></div>`:''}
+    ${p.dam?`<div class="card" style="margin-bottom:12px"><div class="card-title" style="color:var(--red)">🌊 Dam Safety Status</div>
+      <div class="g2">${[['Height',p.dam.h+'m'],['Concrete',p.dam.concrete+'%'],['InSAR Displacement',p.dam.insar_mm+'mm (threshold: 5mm)'],['Seepage',p.dam.seepage+' L/s (limit: 0.5)'],['Reservoir Fill',p.dam.fill_pct+'%'],['Downstream Pop.',p.dam.pop.toLocaleString()]].map(([k,v])=>`<div class="kv-row"><span class="kv-key">${k}</span><span class="kv-val ${v.includes('1.8')?'mint':''}">${v}</span></div>`).join('')}</div></div>`:''}
+    ${p.mining?`<div class="card" style="margin-bottom:12px"><div class="card-title">⛏️ Mining Intelligence</div>
+      <div class="g2">${[['Type',p.mining.type],['Pit Depth',p.mining.depth_m+'m'],['Production',p.mining.prod_mt+' MT/yr'],['Dust PM10',p.mining.dust_pm10+' µg/m³'],['InSAR (Pit Wall)',p.mining.insar_mm+'mm']].map(([k,v])=>`<div class="kv-row"><span class="kv-key">${k}</span><span class="kv-val">${v}</span></div>`).join('')}</div></div>`:''}
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn-primary" onclick="closeModal();showPortal('sat')">🛰️ Open Satellite View</button>
+      <button class="btn" onclick="closeModal();showPortal('gps')">📍 View GPS Fleet</button>
+      <button class="btn" onclick="closeModal();showPortal('fusion')">🔗 Open Fusion Intel</button>
+    </div>`;
+  document.getElementById('proj-modal').classList.add('open');
+}
+</script>
+<script>
+// ═══════════════════════════════════════════
+// GPS PORTAL
+// ═══════════════════════════════════════════
+let _gpsMap=null;
+function initGPS(){
+  renderMachineList('dholera');renderGPSFleetChart();renderGeofenceLog();renderMLLog();renderMLOverlay();
+  setTimeout(()=>{
+    _gpsMap=L.map('gps-map',{zoomControl:true}).setView([22.237,72.202],14);
+    L.tileLayer(TMAP,{attribution:'©CARTO'}).addTo(_gpsMap);_maps.gps=_gpsMap;
+    L.polygon([[22.215,72.17],[22.265,72.17],[22.265,72.24],[22.215,72.24]],{color:'#00D68F',weight:2,fillOpacity:.04,dashArray:'6,4'}).addTo(_gpsMap).bindPopup('Site Boundary');
+    L.polygon([[22.218,72.175],[22.225,72.175],[22.225,72.185],[22.218,72.185]],{color:'#E53E3E',weight:2,fillOpacity:.07}).addTo(_gpsMap).bindPopup('🚫 Restricted Zone');
+    GPS_MACHINES.dholera.forEach(m=>addGPSMarker(m,_gpsMap));
+    _gpsInterval=setInterval(simGPSMove,3000);selectMachine(GPS_MACHINES.dholera[0]);
+  },400);
+  const typs=[...new Set(GPS_MACHINES.dholera.map(m=>m.t))];
+  const icons={bulldozer:'🟠',excavator:'🔴',crane:'🔵',dumptruck:'🟡',paver:'🟢',roller:'🟣',grader:'🔶'};
+  document.getElementById('gps-legend').innerHTML=typs.map(t=>`<span style="font-size:9px;color:var(--dgray);display:flex;align-items:center;gap:2px">${icons[t]||'⚪'} ${t}</span>`).join('');
+}
+function addGPSMarker(m,map){
+  const col=m.st==='offline'?'#2a3a4a':m.alert?'#E53E3E':m.col||'#00D68F';
+  const ic=L.divIcon({className:'',html:`<div title="${m.n}" style="width:9px;height:9px;background:${col};border:2px solid rgba(255,255,255,.6);border-radius:50%;box-shadow:0 0 7px ${col}70;cursor:pointer;${m.st==='active'?'animation:pulse 2s infinite':''}"></div>`,iconSize:[9,9],iconAnchor:[4,4]});
+  const mk=L.marker([m.lat,m.lng],{icon:ic}).addTo(map);mk.on('click',()=>selectMachine(m));_gpsMarkers[m.id]={mk,data:m};
+}
+function simGPSMove(){
+  GPS_MACHINES.dholera.forEach(m=>{if(m.st==='active'&&m.spd>0){m.lat+=(Math.random()-.5)*.0003;m.lng+=(Math.random()-.5)*.0003;_gpsMarkers[m.id]?.mk.setLatLng([m.lat,m.lng]);}});
+  if(_selMachine){const u=GPS_MACHINES.dholera.find(m=>m.id===_selMachine.id);if(u)updateMDLive(u);}
+}
+function selGpsPark(park,el){
+  document.querySelectorAll('#portal-gps .inner-tab').forEach(x=>x.classList.remove('active'));el.classList.add('active');
+  const names={dholera:'DHOLERA SIR',bhadla:'BHADLA SOLAR',odisha:'ODISHA MINE',rrts:'DELHI RRTS'};
+  document.getElementById('gps-park-name').textContent=names[park]||park.toUpperCase();
+  document.getElementById('gps-count').textContent=(GPS_MACHINES[park]||[]).length+' assets';
+  if(_gpsMap){Object.values(_gpsMarkers).forEach(({mk})=>_gpsMap.removeLayer(mk));_gpsMarkers={};}
+  const machines=GPS_MACHINES[park]||[];renderMachineList(park);
+  if(_gpsMap){const coords={dholera:[22.237,72.202,14],bhadla:[27.54,71.92,14],odisha:[18.75,81.29,14],rrts:[28.8,77.5,12]};const [lt,ln,zm]=coords[park]||[20,78,4];_gpsMap.setView([lt,ln],zm);machines.forEach(m=>addGPSMarker(m,_gpsMap));}
+  if(machines.length)selectMachine(machines[0]);
+}
+function filterMachines(f){const all=GPS_MACHINES.dholera;renderMachineList('dholera',f==='all'?all:f==='alert'?all.filter(m=>m.alert):all.filter(m=>m.st===f));}
+function renderMachineList(park,machines){
+  const m=machines||(GPS_MACHINES[park]||[]);const icons={bulldozer:'🟠',excavator:'🔴',crane:'🔵',dumptruck:'🟡',paver:'🟢',roller:'🟣',grader:'🔶'};
+  document.getElementById('machine-list-body').innerHTML=m.map(x=>`<div class="machine-row" id="mr-${x.id}" onclick="selectMachineById('${x.id}','${park}')"><div class="m-dot ${x.alert?'alert':x.st}"></div><div class="m-info"><div class="m-name">${icons[x.t]||'⚙️'} ${x.n}</div><div class="m-meta">${x.t} · Zone ${x.zone} · ${x.op}</div>${x.alert?`<div style="font-size:9px;color:var(--red)">⚠ ${x.alert.replace(/_/g,' ').toUpperCase()}</div>`:''}</div><div class="m-spd">${x.spd>0?x.spd+' km/h':'—'}</div></div>`).join('');
+}
+function selectMachineById(id,park){const m=(GPS_MACHINES[park]||GPS_MACHINES.dholera).find(x=>x.id===id);if(m){selectMachine(m);_gpsMap?.setView([m.lat,m.lng],16);}}
+function selectMachine(m){_selMachine=m;document.querySelectorAll('.machine-row').forEach(r=>r.classList.remove('sel'));document.getElementById('mr-'+m.id)?.classList.add('sel');document.getElementById('md-name').textContent=m.n;document.getElementById('md-sub').textContent=m.t.toUpperCase()+' · Zone '+m.zone;updateMDLive(m);}
+function updateMDLive(m){
+  document.getElementById('md-body').innerHTML=`
+    <div class="md-sec"><div class="md-sec-title">LIVE STATUS</div>${[['Status',m.st.toUpperCase(),m.st==='active'?'mint':m.st==='idle'?'gold':'red'],['Speed',m.spd+' km/h','mint'],['Coords',m.lat.toFixed(4)+', '+m.lng.toFixed(4),''],['Operator',m.op,''],['Last Ping',m.ping,''],m.alert?['⚠ ALERT',m.alert.replace(/_/g,' ').toUpperCase(),'red']:null].filter(Boolean).map(([k,v,c])=>`<div class="kv"><span class="kv-k">${k}</span><span class="kv-v ${c}">${v}</span></div>`).join('')}</div>
+    <div class="md-sec"><div class="md-sec-title">🧠 ML ACTIVITY CLASSIFICATION</div><div class="ml-box"><div class="ml-curr">${m.act}</div><div class="ml-conf">Confidence: ${m.conf}%</div><div class="ml-pattern">GPS signature: ${m.spd>10?'Fast straight-line movement → material transport':m.spd>2?'Slow methodical movement → active earthwork':m.spd===0?'Stationary, engine signature → idle or lift operation':'Very slow precision movement → grading/paving'}</div></div></div>
+    <div class="md-sec"><div class="md-sec-title">ENGINE & FUEL (CAN bus)</div>${[['Fuel',(m.fuel||'—')+'%',m.fuel<30?'red':m.fuel<60?'gold':'mint'],['Engine Hours',m.hrs+' hrs',''],['Service Due',m.hrs>2000?'< 200 hrs':'On schedule','gold']].map(([k,v,c])=>`<div class="kv"><span class="kv-k">${k}</span><span class="kv-v ${c}">${v}</span></div>`).join('')}</div>
+    <div class="md-sec"><div class="md-sec-title">🛰️ SATELLITE CORROBORATION</div><div style="font-size:9px;color:var(--dgray);line-height:1.5">Sentinel-1 SAR pass 3h ago<br>GPS position vs SAR detection: <span style="color:var(--mint)">✓ Match confirmed</span><br>Equipment visible in backscatter: <span style="color:var(--mint)">Yes</span></div></div>
+    <div class="md-sec" style="border:none"><div class="md-sec-title">TODAY — ACTIVE / IDLE / OFFLINE</div><div class="activity-bar" id="md-actbar"></div><div style="display:flex;justify-content:space-between;font-size:8px;color:var(--dgray);margin-top:1px"><span>06:00</span><span>12:00</span><span>18:00</span><span>Now</span></div><canvas id="md-chart" height="70" style="margin-top:8px"></canvas></div>`;
+  renderActivityBar(m);renderMDChart(m);
+}
+let _mdChart=null;
+function renderMDChart(m){setTimeout(()=>{const c=document.getElementById('md-chart');if(!c)return;if(_mdChart){_mdChart.destroy();_mdChart=null;}_mdChart=new Chart(c,{type:'bar',data:{labels:['Active','Idle','Offline'],datasets:[{data:[m.d.active,m.d.idle,m.d.off],backgroundColor:['#00D68F','#F0A500','#2a3a4a'],borderRadius:3}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,max:12,ticks:{color:'#5A7A94',font:{size:8}},grid:{color:'#112240'}},x:{ticks:{color:'#5A7A94',font:{size:8}},grid:{display:false}}}}});},60);}
+function renderActivityBar(m){const bar=document.getElementById('md-actbar');if(!bar)return;const tot=m.d.active+m.d.idle+m.d.off;bar.innerHTML=[{c:'#00D68F',p:m.d.active/tot},{c:'#F0A500',p:m.d.idle/tot},{c:'#2a3a4a',p:m.d.off/tot}].map(s=>`<div class="act-seg" style="width:${s.p*100}%;background:${s.c}"></div>`).join('');}
+let _fleetChart=null;
+function renderGPSFleetChart(){const c=document.getElementById('fleet-chart');if(!c)return;const typs=[...new Set(GPS_MACHINES.dholera.map(m=>m.t))];if(_fleetChart)_fleetChart.destroy();_fleetChart=new Chart(c,{type:'bar',data:{labels:typs.map(t=>t.slice(0,6)),datasets:[{label:'Active',data:typs.map(t=>GPS_MACHINES.dholera.filter(m=>m.t===t&&m.st==='active').length),backgroundColor:'#00D68F',borderRadius:2},{label:'Idle',data:typs.map(t=>GPS_MACHINES.dholera.filter(m=>m.t===t&&(m.st==='idle'||m.st==='offline')).length),backgroundColor:'#F0A500',borderRadius:2}]},options:{responsive:true,plugins:{legend:{labels:{color:'#5A7A94',font:{size:9},boxWidth:10}}},scales:{x:{stacked:true,ticks:{color:'#5A7A94',font:{size:8}},grid:{display:false}},y:{stacked:true,ticks:{color:'#5A7A94'},grid:{color:'#112240'}}}}});}
+function renderGeofenceLog(){document.getElementById('geofence-log').innerHTML=[{t:'23:51',m:'VOL-002 Dump Truck — Unauthorized exit Gate 3 loaded',lv:'crit'},{t:'22:14',m:'CAT-001 approaching restricted buffer — auto-alert',lv:'warn'},{t:'01:22',m:'Unknown vehicle — Krishnapatnam buffer entry',lv:'crit'},{t:'08:30',m:'JD-001 Grader entered Zone C — scheduled',lv:'info'}].map(e=>`<div class="alert-item ${e.lv}" style="margin-bottom:4px"><div class="ai-icon">${e.lv==='crit'?'🔴':e.lv==='warn'?'⚠️':'ℹ️'}</div><div><div class="a-title">${e.m}</div><div class="a-time">${e.t}</div></div></div>`).join('');}
+function renderMLLog(){document.getElementById('ml-pattern-log').innerHTML=[{m:'HIT-002 Excavator',p:'IDLE >4h — possible mechanical failure',c:88},{m:'VOL-002 Dump Truck',p:'Night exit loaded — no manifest filed',c:94},{m:'CAT-002 Bulldozer',p:'Route deviation — boundary approach',c:76},{m:'JD-001 Grader',p:'Low fuel 28% — dispatch fuel truck',c:98}].map(e=>`<div style="padding:7px;background:var(--bg3);border-radius:6px;margin-bottom:4px"><div style="font-size:11px;font-weight:600;color:var(--white)">${e.m}</div><div style="font-size:9px;color:var(--purple);margin:1px 0">${e.p}</div><div style="font-size:9px;color:var(--dgray)">Confidence: ${e.c}%</div></div>`).join('');}
+function renderMLOverlay(){document.getElementById('ml-overlay-content').innerHTML=[{a:'Active Grading',n:'4',c:'var(--mint)'},{a:'Excavation Cycle',n:'3',c:'var(--orange)'},{a:'Material Transport',n:'5',c:'var(--gold)'},{a:'Lift Operation',n:'2',c:'var(--sky)'},{a:'Unauthorized Exit',n:'1',c:'var(--red)'},{a:'Breakdown',n:'1',c:'var(--dgray)'}].map(a=>`<div style="display:flex;justify-content:space-between;margin-bottom:2px"><span style="font-size:8px;color:${a.c}">${a.a}</span><span style="font-size:8px;color:var(--dgray)">${a.n} machine${a.n>1?'s':''}</span></div>`).join('');}
+</script>
+<script>
+// ═══════════════════════════════════════════
+// SATELLITE PORTAL — construction, detection, linear, deforest, resources, change, insar
+// ═══════════════════════════════════════════
+let _satProject='dholera',_satProgress=0.79,_linType='railway';
+const _satMonths=['Mar25','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan26','Feb','Mar26'];
+const _progHist={dholera:[.42,.45,.49,.53,.57,.62,.66,.69,.72,.74,.76,.78,.79],bhadla:[.68,.70,.72,.75,.77,.79,.81,.83,.84,.85,.86,.87,.88],mahsr:[.26,.27,.28,.29,.30,.32,.34,.35,.36,.37,.38,.40,.41],polavaram:[.70,.71,.73,.74,.75,.77,.78,.79,.80,.81,.81,.82,.82],odisha:[.50,.52,.54,.55,.57,.58,.59,.60,.61,.61,.62,.62,.62]};
+
+function initSAT(){
+  document.getElementById('timeline-month-labels').innerHTML=['Mar 25','Jun','Sep','Dec','Mar 26'].map(m=>`<span>${m}</span>`).join('');
+  updateSatProgress('dholera');
+  initDeforestTab();initResourceTab();initInsarTab();
+}
+function switchSatTab(tab,el){
+  document.querySelectorAll('.sat-tab').forEach(t=>t.style.display='none');
+  document.querySelectorAll('#portal-sat .inner-tab').forEach(b=>{b.classList.remove('active');b.style.background='var(--bg3)';b.style.borderColor='var(--bg4)';});
+  document.getElementById('sat-tab-'+tab).style.display='block';
+  el.classList.add('active');el.style.background='var(--teal)';el.style.borderColor='var(--teal)';
+  if(tab==='detect'&&!window._dInit){setTimeout(()=>{drawVehicleDetectionScene(document.getElementById('vdet-canvas'));drawVehicleDetBoxes(document.getElementById('vdet-overlay'));initVdetCharts();renderSarNight();},80);window._dInit=true;}
+  if(tab==='linear'&&!window._lInit){setTimeout(()=>{setLinearType('railway',document.querySelector('#sat-tab-linear .inner-tab'));},80);window._lInit=true;}
+  if(tab==='deforest'&&!window._fInit){setTimeout(()=>{drawDeforestScene(document.getElementById('deforest-canvas'),.35);initForestCharts();},80);window._fInit=true;}
+  if(tab==='resources'&&!window._rInit){setTimeout(()=>{setResourceMode('mineral',document.querySelector('#sat-tab-resources .inner-tab'));initResourceCharts();},80);window._rInit=true;}
+  if(tab==='change'&&!window._cInit){setTimeout(()=>{initSplitView();drawChangeHeatmap(document.getElementById('change-heatmap'));initChangeCharts();},80);window._cInit=true;}
+  if(tab==='insar'&&!window._iInit){setTimeout(()=>{drawInSARScene(document.getElementById('insar-canvas'));initInsarChart();},80);window._iInit=true;}
+}
+function updateSatProgress(proj){
+  _satProject=proj||'dholera';const p=ALL_PROJECTS.find(x=>x.id===_satProject)||ALL_PROJECTS[0];_satProgress=p.prog/100;
+  document.getElementById('sat-prog-project').textContent=p.n;
+  setTimeout(()=>{const mc=document.getElementById('sat-main-canvas'),dc=document.getElementById('sat-detect-overlay');
+    if(mc)drawSatScene(mc,_satProject,_satProgress,_satBand);if(dc)drawDetectionBoxes(dc);
+    renderSatMetrics(p);renderSatMonthlyChart();renderSatDetectTable(p);renderSatPasses();},80);
+}
+function updateSatTimeline(val){document.getElementById('sat-date-label').textContent=_satMonths[val]?_satMonths[val].replace(/(\d{2})$/,' 20$1'):'Mar 2026';const h=_progHist[_satProject]||_progHist.dholera;const prog=h[Math.min(val,h.length-1)];const mc=document.getElementById('sat-main-canvas'),dc=document.getElementById('sat-detect-overlay');if(mc)drawSatScene(mc,_satProject,prog,_satBand);if(dc)drawDetectionBoxes(dc);}
+function setSatBand(band){_satBand=band;const mc=document.getElementById('sat-main-canvas'),dc=document.getElementById('sat-detect-overlay');if(mc)drawSatScene(mc,_satProject,_satProgress,band);if(dc)drawDetectionBoxes(dc);const lbl={ndvi:'NDVI — Sentinel-2 B8/B4',sar:'SAR Backscatter — Sentinel-1 VV',rgb:'True Color — Sentinel-2 B4/B3/B2',swir:'SWIR Composite — B11/B8/B2'};document.getElementById('sat-band-label').textContent=lbl[band]||'NDVI';}
+function toggleDetection(btn){_detOn=!_detOn;btn.style.borderColor=_detOn?'var(--orange)':'var(--bg4)';btn.style.color=_detOn?'var(--orange)':'var(--dgray)';btn.textContent=(_detOn?'✓ ':'○ ')+'Show AI Detections';const dc=document.getElementById('sat-detect-overlay');if(dc)drawDetectionBoxes(dc);}
+function compareToggle(){const tabs=document.querySelectorAll('#portal-sat .inner-tab');switchSatTab('change',tabs[5]);}
+let _satMonthlyChart=null;
+function renderSatMonthlyChart(){const c=document.getElementById('sat-monthly-chart');if(!c)return;const h=(_progHist[_satProject]||_progHist.dholera).map(v=>Math.round(v*100));if(_satMonthlyChart)_satMonthlyChart.destroy();_satMonthlyChart=new Chart(c,{type:'line',data:{labels:_satMonths,datasets:[{label:'% Progress (Satellite-derived)',data:h,borderColor:'#00D68F',backgroundColor:'rgba(0,214,143,.12)',tension:.4,pointRadius:2,fill:true}]},options:{responsive:true,plugins:{legend:{labels:{color:'#5A7A94',font:{size:9}}}},scales:{y:{min:0,max:100,ticks:{color:'#5A7A94',font:{size:8}},grid:{color:'#112240'}},x:{ticks:{color:'#5A7A94',font:{size:8},maxTicksLimit:7},grid:{display:false}}}}});}
+function renderSatMetrics(p){const metrics=p.metrics||[{label:'Overall Progress',pct:p.prog,col:'var(--mint)'},{label:'Equipment Activity',pct:Math.round(p.ai*.92),col:'var(--orange)'},{label:'Boundary Compliance',pct:p.alert==='crit'?60:96,col:p.alert==='crit'?'var(--red)':'var(--mint)'},{label:'Vegetation Index',pct:p.t==='mining'?28:74,col:p.t==='mining'?'var(--gold)':'var(--mint)'}];document.getElementById('sat-progress-metrics').innerHTML=metrics.map(m=>`<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="font-size:10px;color:var(--dgray)">${m.label}</span><span style="font-size:11px;font-weight:700;color:${m.col}">${m.pct}%</span></div><div class="pbar"><div class="pfill" style="width:${m.pct}%;background:${m.col}"></div></div></div>`).join('');}
+function renderSatDetectTable(p){const rows=[{cls:'Bulldozer / Dozer',sat:4,gps:4,model:'YOLOv8 + DOTA',band:'Planet 3m RGB',conf:'94%',last:'09:41'},{cls:'Excavator / Backhoe',sat:3,gps:3,model:'YOLOv8',band:'Sentinel-1 SAR',conf:'97%',last:'09:38'},{cls:'Dump Truck',sat:5,gps:5,model:'YOLOv8',band:'Planet 3m RGB',conf:'99%',last:'09:40'},{cls:'Tower Crane',sat:2,gps:2,model:'SatLas + SAM',band:'Sentinel-1 SAR',conf:'96%',last:'09:35'},{cls:'Concrete Paver',sat:1,gps:1,model:'YOLOv8',band:'Planet 3m',conf:'98%',last:'09:39'},{cls:'Grader / Roller',sat:2,gps:2,model:'YOLOv8',band:'Planet 3m',conf:'92%',last:'09:37'},{cls:'Light Vehicles',sat:12,gps:14,model:'Prithvi + SAM',band:'Planet 3m RGB',conf:'84%',last:'09:41'},{cls:'Parked / Idle',sat:8,gps:9,model:'SAR Coherence',band:'Sentinel-1 SAR',conf:'81%',last:'09:35'}];document.getElementById('sat-detect-table').innerHTML=rows.map(r=>`<tr><td><strong>${r.cls}</strong></td><td style="color:var(--orange);font-weight:700">${r.sat}</td><td style="color:var(--mint);font-weight:700">${r.gps}</td><td><span class="badge ${r.sat===r.gps?'badge-released':'badge-pending'}">${r.sat===r.gps?'✓ MATCH':Math.abs(r.sat-r.gps)+' gap'}</span></td><td style="color:var(--sky)">${r.conf}</td><td style="font-size:9px;color:var(--dgray)">${r.model}</td><td style="font-size:9px;color:var(--dgray)">${r.band}</td><td style="font-size:9px;color:var(--teal)">${r.last}</td></tr>`).join('');}
+function renderSatPasses(){document.getElementById('sat-passes-list').innerHTML=SAT_SCHEDULE.map(s=>`<div style="display:flex;gap:7px;padding:7px;background:var(--bg3);border-radius:5px;margin-bottom:4px"><span>🛰️</span><div style="flex:1"><div style="font-size:10px;font-weight:600;color:var(--white)">${s.sat}</div><div style="font-size:9px;color:var(--dgray)">${s.res} · ${s.cloud} cloud</div></div><div style="text-align:right"><div style="font-size:9px;color:var(--teal)">${s.time}</div><div style="font-size:9px;color:${s.st==='done'?'var(--mint)':'var(--gold)'}">${s.st}</div></div></div>`).join('');}
+
+// VEHICLE DETECTION
+let _vdetCompareChart=null,_vdetHistChart=null;
+function initVdetCharts(){
+  const c1=document.getElementById('vdet-compare-chart');if(c1){if(_vdetCompareChart)_vdetCompareChart.destroy();_vdetCompareChart=new Chart(c1,{type:'bar',data:{labels:['Dozer','Excav','Truck','Crane','Paver','Light'],datasets:[{label:'Satellite',data:[4,3,5,2,1,12],backgroundColor:'#F6891F',borderRadius:2},{label:'GPS',data:[4,3,5,2,1,14],backgroundColor:'#00D68F',borderRadius:2}]},options:{responsive:true,plugins:{legend:{labels:{color:'#5A7A94',font:{size:9},boxWidth:10}}},scales:{x:{ticks:{color:'#5A7A94',font:{size:8}},grid:{display:false}},y:{ticks:{color:'#5A7A94'},grid:{color:'#112240'}}}}});}
+  const c2=document.getElementById('vdet-history-chart');if(c2){if(_vdetHistChart)_vdetHistChart.destroy();_vdetHistChart=new Chart(c2,{type:'line',data:{labels:Array.from({length:30},(_,i)=>i+1),datasets:[{label:'Detected',data:[22,24,21,26,28,30,29,31,28,32,34,30,33,35,38,36,34,37,40,38,42,40,44,42,41,45,43,46,44,42],borderColor:'#F6891F',tension:.4,pointRadius:0,fill:false}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#5A7A94',font:{size:7},maxTicksLimit:6},grid:{display:false}},y:{ticks:{color:'#5A7A94',font:{size:8}},grid:{color:'#112240'}}}}});}
+}
+function renderSarNight(){document.getElementById('sar-night-detections').innerHTML=[{t:'02:14',m:'1 dump truck — Gate 3 area',lv:'crit',d:'SAR backscatter + acoustic. No manifest.'},{t:'03:11',m:'Convoy 3 vehicles — main road',lv:'info',d:'Scheduled cement delivery.'},{t:'01:48',m:'Stationary excavator — Zone B',lv:'info',d:'Parked overnight, normal.'}].map(e=>`<div class="alert-item ${e.lv}" style="margin-bottom:4px"><div class="ai-icon">${e.lv==='crit'?'🔴':'🌙'}</div><div><div class="a-title">${e.m}</div><div class="a-detail">${e.d}</div><div class="a-time">${e.t} · Sentinel-1 SAR night pass</div></div></div>`).join('');}
+
+// LINEAR INFRASTRUCTURE
+function setLinearType(type,el){
+  _linType=type;document.querySelectorAll('#sat-tab-linear .inner-tab').forEach(b=>b.classList.remove('active'));if(el)el.classList.add('active');
+  const data={railway:{km:82,done:68,lbl:'82km · Delhi-Meerut RRTS',segs:[{n:'Sahibabad–Ghaziabad',km:0,len:12,st:'complete',gps:4},{n:'Ghaziabad–Muradnagar',km:12,len:14,st:'complete',gps:8},{n:'Muradnagar–Modinagar',km:26,len:12,st:'track_laid',gps:12},{n:'Modinagar–Modinagar N',km:38,len:10,st:'track_laid',gps:6},{n:'Modinagar N–Meerut S',km:48,len:14,st:'ballast',gps:18},{n:'Meerut South Station',km:62,len:6,st:'earthwork',gps:22},{n:'Meerut–Shatabdi Nagar',km:68,len:8,st:'earthwork',gps:8},{n:'Shatabdi–Meerut North',km:76,len:6,st:'not_started',gps:0}],unit:'🚂'},
+    road:{km:480,done:374,lbl:'480km · Nairobi-Mombasa Highway',segs:[{n:'Nairobi–Machakos',km:0,len:60,st:'complete',gps:12},{n:'Machakos–Mtito Andei',km:60,len:100,st:'complete',gps:8},{n:'Mtito–Voi',km:160,len:100,st:'track_laid',gps:18},{n:'Voi–Mombasa',km:260,len:220,st:'ballast',gps:28}],unit:'🚚'},
+    transmission:{km:220,done:162,lbl:'220km · Delhi-Agra 765kV',segs:[{n:'Ballabhgarh–Palwal',km:0,len:40,st:'complete',gps:6},{n:'Palwal–Mathura',km:40,len:60,st:'complete',gps:4},{n:'Mathura–Agra',km:100,len:60,st:'track_laid',gps:14},{n:'Agra South Terminal',km:160,len:60,st:'earthwork',gps:8}],unit:'🔌'}};
+  const d=data[type];if(!d)return;
+  document.getElementById('linear-corridor-label').textContent=d.lbl;
+  document.getElementById('linear-sat-label').textContent=type==='railway'?'NDVI — Corridor Buffer 200m':type==='road'?'Spectral — Pavement Detection':'SAR — Right-of-Way Clearing';
+  const stCols={complete:'#22C55E',track_laid:'#3B82F6',ballast:'#F59E0B',earthwork:'#F6891F',not_started:'#2a3a4a'};
+  const stLabels={complete:type==='transmission'?'Strung':type==='road'?'Paved':'Track Laid',track_laid:type==='transmission'?'Towers Up':'Ballast/Base',ballast:'Sub-base',earthwork:'Earthwork',not_started:'Not Started'};
+  const cor=document.getElementById('linear-corridor');cor.innerHTML='';
+  d.segs.forEach(sg=>{cor.innerHTML+=`<div class="corridor-segment" style="left:${(sg.km/d.km)*100}%;width:${(sg.len/d.km)*100}%;background:${stCols[sg.st]};opacity:.85" title="${sg.n}">${sg.len}km</div>`;});
+  cor.innerHTML+=`<div class="corridor-machine" style="left:${(d.done/d.km)*100}%">${d.unit}</div>`;
+  document.getElementById('linear-km-labels').innerHTML=`<span>0</span><span>${Math.round(d.km*.25)}km</span><span>${Math.round(d.km*.5)}km</span><span>${Math.round(d.km*.75)}km</span><span>${d.km}km</span>`;
+  document.getElementById('linear-seg-tbody').innerHTML=d.segs.map(sg=>`<tr><td><strong>${sg.n}</strong></td><td>km ${sg.km}–${sg.km+sg.len}</td><td><span class="badge" style="background:${stCols[sg.st]}22;color:${stCols[sg.st]};border:1px solid ${stCols[sg.st]}44">${stLabels[sg.st]}</span></td><td>${Math.round((sg.st==='complete'?100:sg.st==='track_laid'?70:sg.st==='ballast'?45:sg.st==='earthwork'?20:0))}%</td><td style="color:var(--orange)">${sg.gps>0?sg.gps+' machines':'—'}</td><td style="font-size:9px;color:var(--teal)">${sg.st==='complete'?'Sentinel-2':sg.gps>10?'GPS+SAR':'Sentinel-1'}</td><td>${sg.st==='not_started'?'<span class="badge badge-locked">PENDING</span>':sg.gps>15?'<span class="badge badge-pending">HIGH ACTIVITY</span>':''}</td></tr>`).join('');
+  document.getElementById('linear-info').innerHTML=`<div style="display:flex;gap:12px;flex-wrap:wrap"><div><span style="font-size:9px;color:var(--dgray)">PROGRESS</span><div style="font-size:18px;font-weight:800;color:var(--mint)">${Math.round(d.done/d.km*100)}%</div></div><div><span style="font-size:9px;color:var(--dgray)">${type==='transmission'?'STRUNG':type==='road'?'PAVED':'TRACK LAID'}</span><div style="font-size:18px;font-weight:800;color:var(--white)">${d.done} <span style="font-size:11px;color:var(--dgray)">/ ${d.km} km</span></div></div><div><span style="font-size:9px;color:var(--dgray)">SEGMENTS</span><div style="font-size:18px;font-weight:800;color:var(--white)">${d.segs.filter(s=>s.st==='complete').length} <span style="font-size:11px;color:var(--dgray)">/ ${d.segs.length} done</span></div></div><div><span style="font-size:9px;color:var(--dgray)">ACTIVE MACHINES</span><div style="font-size:18px;font-weight:800;color:var(--orange)">${d.segs.reduce((a,s)=>a+s.gps,0)}</div></div></div>`;
+  document.getElementById('linear-alerts').innerHTML=[{lv:'warn',t:'Track machine idle >4h — Ballast segment',d:'Schedule delay risk flagged'},{lv:'info',t:'New satellite pass available',d:'Sentinel-2 captured corridor 15 Mar'},{lv:'crit',t:type==='railway'?'Earthwork delay — Meerut South':'Segment behind schedule',d:'2 weeks behind baseline'}].map(e=>`<div class="alert-item ${e.lv}" style="margin-bottom:4px"><div class="ai-icon">${e.lv==='crit'?'🔴':e.lv==='warn'?'⚠️':'ℹ️'}</div><div><div class="a-title">${e.t}</div><div class="a-detail">${e.d}</div></div></div>`).join('');
+  document.getElementById('linear-legend').innerHTML=Object.entries(stLabels).map(([k,v])=>`<div style="display:flex;align-items:center;gap:5px;margin-bottom:4px"><span style="width:12px;height:8px;border-radius:2px;background:${stCols[k]};display:inline-block"></span><span style="font-size:10px;color:var(--dgray)">${v}</span></div>`).join('');
+  drawLinearScene(document.getElementById('linear-canvas'),type,d.done/d.km);
+  renderLinearChart(type);
+}
+let _linChart=null;
+function renderLinearChart(type){const c=document.getElementById('linear-progress-chart');if(!c)return;const data={railway:[2,3,2.5,3,4,5,4,3.5,4,5,4,3.5],road:[8,10,12,9,11,14,12,10,13,15,12,11],transmission:[4,5,6,5,7,8,6,5,7,8,6,5]};if(_linChart)_linChart.destroy();_linChart=new Chart(c,{type:'bar',data:{labels:_satMonths.slice(1),datasets:[{label:'km/month',data:data[type]||data.railway,backgroundColor:'#22C55E',borderRadius:2}]},options:{responsive:true,plugins:{legend:{labels:{color:'#5A7A94',font:{size:9}}}},scales:{x:{ticks:{color:'#5A7A94',font:{size:7},maxTicksLimit:6},grid:{display:false}},y:{ticks:{color:'#5A7A94',font:{size:8}},grid:{color:'#112240'}}}}});}
+
+// DEFORESTATION
+function initDeforestTab(){
+  document.getElementById('deforest-alerts').innerHTML=[{lv:'crit',t:'2.8 ha excess clearing — IKN buffer',d:'AMDAL boundary exceeded. GPS: 3 dozers in zone.',time:'2 days ago'},{lv:'warn',t:'0.4 ha cleared — Krishnapatnam CRZ',d:'Coastal regulation zone violation',time:'5 days ago'},{lv:'info',t:'Revegetation detected — Odisha',d:'34% of disturbed area greening',time:'1 week ago'}].map(e=>`<div class="alert-item ${e.lv}" style="margin-bottom:4px"><div class="ai-icon">${e.lv==='crit'?'🔴':e.lv==='warn'?'⚠️':'🌱'}</div><div><div class="a-title">${e.t}</div><div class="a-detail">${e.d}</div><div class="a-time">${e.time}</div></div></div>`).join('');
+  document.getElementById('deforest-zones').innerHTML=[{z:'IKN Nusantara Buffer',loss:'2.8 ha',pct:'+340%',col:'var(--red)'},{z:'Krishnapatnam CRZ',loss:'0.4 ha',pct:'+12%',col:'var(--gold)'},{z:'Nairobi Corridor',loss:'1.2 ha',pct:'planned',col:'var(--mint)'},{z:'Bailadila Mine Edge',loss:'-0.8 ha',pct:'revegetated',col:'var(--mint)'}].map(z=>`<div style="display:flex;justify-content:space-between;padding:7px;background:var(--bg3);border-radius:5px;margin-bottom:4px"><div><div style="font-size:11px;color:var(--white)">${z.z}</div><div style="font-size:9px;color:var(--dgray)">Change: ${z.pct}</div></div><div style="font-size:13px;font-weight:700;color:${z.col}">${z.loss}</div></div>`).join('');
+}
+function setDeforestView(v,el){document.querySelectorAll('#sat-tab-deforest .inner-tab').forEach(b=>b.classList.remove('active'));if(el)el.classList.add('active');drawDeforestScene(document.getElementById('deforest-canvas'),.35);}
+function updateDeforestTimeline(val){document.getElementById('deforest-date').textContent=_satMonths[val]?_satMonths[val].replace(/(\d{2})$/,' 20$1'):'Mar 2026';drawDeforestScene(document.getElementById('deforest-canvas'),.2+val*.02);}
+let _forestChart=null;
+function initForestCharts(){const c=document.getElementById('forest-cover-chart');if(!c)return;if(_forestChart)_forestChart.destroy();_forestChart=new Chart(c,{type:'line',data:{labels:_satMonths,datasets:[{label:'Forest Cover %',data:[88,88,87,87,86,85,84,82,80,78,76,74,72],borderColor:'#22C55E',backgroundColor:'rgba(34,197,94,.12)',tension:.4,pointRadius:2,fill:true}]},options:{responsive:true,plugins:{legend:{labels:{color:'#5A7A94',font:{size:9}}}},scales:{y:{min:60,max:100,ticks:{color:'#5A7A94',font:{size:8}},grid:{color:'#112240'}},x:{ticks:{color:'#5A7A94',font:{size:7},maxTicksLimit:6},grid:{display:false}}}}});}
+
+// NATURAL RESOURCES
+function initResourceTab(){
+  document.getElementById('thermal-anomalies').innerHTML=[{t:'Coal seam fire — Jharia',temp:'+48°C',lv:'crit'},{t:'Cooling tower plume — NTPC',temp:'+34°C',lv:'info'},{t:'Solar inverter hotspot — Bhadla',temp:'+12°C',lv:'warn'}].map(e=>`<div class="sensor-row"><div class="sensor-icon">${e.lv==='crit'?'🔥':'🌡️'}</div><div class="sensor-info"><div class="sensor-name">${e.t}</div><div class="sensor-val ${e.lv==='crit'?'sensor-alert':''}">${e.temp} above ambient</div></div></div>`).join('');
+  document.getElementById('extraction-volumes').innerHTML=[{m:'Iron Ore — Bailadila',v:'+28,500 T',d:'DSM change · daily'},{m:'Coal — Rajrappa',v:'+890 T',d:'Pit volume estimate'},{m:'Gold ore — AngloGold',v:'+420 T',d:'Spoil heap delta'}].map(e=>`<div style="display:flex;justify-content:space-between;padding:7px;background:var(--bg3);border-radius:5px;margin-bottom:4px"><div><div style="font-size:11px;color:var(--white)">${e.m}</div><div style="font-size:9px;color:var(--dgray)">${e.d}</div></div><div style="font-size:12px;font-weight:700;color:var(--mint)">${e.v}</div></div>`).join('');
+}
+function setResourceMode(mode,el){
+  document.querySelectorAll('#sat-tab-resources .inner-tab').forEach(b=>b.classList.remove('active'));if(el)el.classList.add('active');
+  drawResourceScene(document.getElementById('resource-canvas'),mode);
+  const info={mineral:{l:'SWIR COMPOSITE — Mineral Mapping',b:'Sentinel-2 B11/B8/B2 (SWIR/NIR/Blue)',leg:[['Iron oxide','#c85020'],['Clay minerals','#b49028'],['Vegetation','#50a038'],['Bare rock','#787868']]},water:{l:'NDWI — Water Detection',b:'Sentinel-2 B3/B8 (Green/NIR)',leg:[['Open water','#1464c8'],['Wet soil','#3c9696'],['Dry land','#787850']]},thermal:{l:'LST — Thermal Infrared',b:'Landsat 9 TIRS / ECOSTRESS',leg:[['Hot (>40°C)','#e03c1e'],['Warm','#f0a000'],['Cool','#1e64c8']]},soil:{l:'SAVI — Soil Adjusted Index',b:'Sentinel-2 B8/B4 + L correction',leg:[['Bare soil','#785020'],['Sparse veg','#8c7832'],['Healthy veg','#50a03c']]}};
+  const i=info[mode]||info.mineral;
+  document.getElementById('resource-band-info').innerHTML=`<div style="font-size:9px;font-weight:700;color:var(--purple)">${i.l}</div><div style="font-size:9px;color:var(--dgray);margin-top:2px">${i.b}</div>`;
+  document.getElementById('resource-legend-content').innerHTML=i.leg.map(([n,c])=>`<div class="rl-item"><span class="rl-dot" style="background:${c}"></span>${n}</div>`).join('');
+  const findings={mineral:'Iron oxide signatures concentrated in NW pit sector. Clay alteration zones suggest hydrothermal activity. SWIR ratio B11/B12 indicates high-grade hematite deposits in detected zones.',water:'2 new water accumulation zones detected in mine pit — flood risk. NDWI confirms 4.2 ha standing water. Acid mine drainage signature flagged in southern catchment.',thermal:'Coal seam fire detected at Jharia (+48°C anomaly). NTPC cooling tower thermal plume confirms active generation. 34 solar panel hotspots indicate degraded cells at Bhadla.',soil:'Soil moisture deficit in embankment zones. SAVI indicates poor revegetation in 66% of disturbed mining area — compliance gap. Topsoil stripping detected in 3 new zones.'};
+  document.getElementById('resource-findings').innerHTML=`<div style="font-size:11px;color:var(--text);line-height:1.6;background:var(--bg3);padding:10px;border-radius:6px">${findings[mode]||findings.mineral}</div>`;
+}
+let _waterChart=null;
+function initResourceCharts(){const c=document.getElementById('water-chart');if(!c)return;if(_waterChart)_waterChart.destroy();_waterChart=new Chart(c,{type:'line',data:{labels:_satMonths,datasets:[{label:'Pit Water (ha)',data:[0.2,0.4,0.8,1.2,2.1,3.4,4.2,3.8,2.4,1.8,1.2,0.8,4.2],borderColor:'#1464c8',backgroundColor:'rgba(20,100,200,.15)',tension:.4,pointRadius:2,fill:true}]},options:{responsive:true,plugins:{legend:{labels:{color:'#5A7A94',font:{size:9}}}},scales:{y:{ticks:{color:'#5A7A94',font:{size:8}},grid:{color:'#112240'}},x:{ticks:{color:'#5A7A94',font:{size:7},maxTicksLimit:6},grid:{display:false}}}}});}
+
+// CHANGE DETECTION
+let _changeCatChart=null;
+function initChangeCharts(){
+  const c=document.getElementById('change-category-chart');if(c){if(_changeCatChart)_changeCatChart.destroy();_changeCatChart=new Chart(c,{type:'doughnut',data:{labels:['Construction','Vegetation Loss','New Water','Earthwork','Unchanged'],datasets:[{data:[42,18,8,24,8],backgroundColor:['#8a3a1a','#8a1a1a','#1a4f8a','#F59E0B','#1e2030'],borderWidth:0}]},options:{responsive:true,plugins:{legend:{position:'right',labels:{color:'#5A7A94',font:{size:9},boxWidth:10}}}}});}
+  document.getElementById('change-alerts').innerHTML=[{lv:'crit',t:'New structure in CRZ — 0.4 ha',d:'Construction where none existed Oct 2025'},{lv:'warn',t:'Vegetation cleared — 2.8 ha',d:'NDVI dropped 0.6→0.1 in buffer zone'},{lv:'info',t:'Reservoir filling — +12 ha water',d:'Expected — Polavaram impoundment'}].map(e=>`<div class="alert-item ${e.lv}" style="margin-bottom:4px"><div class="ai-icon">${e.lv==='crit'?'🔴':e.lv==='warn'?'⚠️':'ℹ️'}</div><div><div class="a-title">${e.t}</div><div class="a-detail">${e.d}</div></div></div>`).join('');
+  document.getElementById('change-stats').innerHTML=[['Total area analyzed','4,847 ha'],['Significant change','892 ha (18.4%)'],['New construction','342 ha'],['Vegetation loss','156 ha'],['Detection method','ChangeFormer + NDVI diff'],['Confidence','0.91']].map(([k,v])=>`<div class="kv-row"><span class="kv-key">${k}</span><span class="kv-val">${v}</span></div>`).join('');
+}
+
+// INSAR
+function initInsarTab(){
+  document.getElementById('insar-status-text').textContent='Max displacement 1.8mm — Within safe limit (threshold 5mm). Dam body STABLE.';
+  document.getElementById('insar-points').innerHTML=[{n:'Dam Crest — Center',mm:'+1.8mm',st:'safe'},{n:'Left Abutment',mm:'+0.9mm',st:'safe'},{n:'Right Abutment',mm:'+1.2mm',st:'safe'},{n:'Spillway Structure',mm:'+0.4mm',st:'safe'},{n:'Downstream Toe',mm:'-0.6mm',st:'safe'}].map(p=>`<div style="display:flex;justify-content:space-between;padding:6px 8px;background:var(--bg3);border-radius:5px;margin-bottom:4px"><span style="font-size:10px;color:var(--white)">${p.n}</span><span style="font-size:11px;font-weight:700;color:var(--mint)">${p.mm}</span></div>`).join('');
+  document.getElementById('insar-alerts').innerHTML=[{lv:'info',t:'Polavaram: 1.8mm — SAFE',d:'Monthly InSAR within limits'},{lv:'warn',t:'Odisha pit wall: -3.8mm',d:'Approaching watch threshold'},{lv:'info',t:'Dholera road: -12mm settlement',d:'Embankment consolidation normal'}].map(e=>`<div class="alert-item ${e.lv}" style="margin-bottom:4px"><div class="ai-icon">${e.lv==='warn'?'⚠️':'✓'}</div><div><div class="a-title">${e.t}</div><div class="a-detail">${e.d}</div></div></div>`).join('');
+  document.getElementById('insar-dam-safety').innerHTML=[['Max displacement','1.8mm'],['Alert threshold','5.0mm'],['Safety margin','64%'],['Seepage rate','0.4 L/s'],['Downstream pop.','520,000'],['Status','SAFE NORMAL']].map(([k,v])=>`<div class="kv-row"><span class="kv-key">${k}</span><span class="kv-val ${v==='SAFE NORMAL'?'mint':''}">${v}</span></div>`).join('');
+}
+let _insarChart=null;
+function initInsarChart(){const c=document.getElementById('insar-timeseries');if(!c)return;if(_insarChart)_insarChart.destroy();_insarChart=new Chart(c,{type:'line',data:{labels:_satMonths,datasets:[{label:'Displacement (mm)',data:[0.2,0.4,0.6,0.7,0.9,1.1,1.2,1.4,1.5,1.6,1.7,1.8,1.8],borderColor:'#00D68F',tension:.4,pointRadius:2,fill:false},{label:'Alert Threshold',data:Array(13).fill(5),borderColor:'#E53E3E',borderDash:[5,4],pointRadius:0,fill:false}]},options:{responsive:true,plugins:{legend:{labels:{color:'#5A7A94',font:{size:9},boxWidth:10}}},scales:{y:{min:0,max:6,ticks:{color:'#5A7A94',font:{size:8}},grid:{color:'#112240'}},x:{ticks:{color:'#5A7A94',font:{size:7},maxTicksLimit:6},grid:{display:false}}}}});}
+</script>
+<script>
+// ═══════════════════════════════════════════
+// FUSION PORTAL
+// ═══════════════════════════════════════════
+function initFusion(){renderFusion('dholera');renderFusionFreshness();renderFusionDisagreements();renderFusionCerts();renderFusionTimeline();}
+function selFusionProj(id,el){document.querySelectorAll('#portal-fusion .inner-tab').forEach(x=>x.classList.remove('active'));el.classList.add('active');const d=FUSION_DATA[id]||FUSION_DATA.dholera;document.getElementById('f-score').textContent=d.score;document.getElementById('f-progress').textContent=d.prog+'%';document.getElementById('f-tranche').textContent=d.tranche;document.getElementById('f-assets').textContent=d.assets;renderFusion(id);}
+function renderFusion(id){
+  const d=FUSION_DATA[id]||FUSION_DATA.dholera;
+  document.getElementById('fusion-sources').innerHTML=d.sources.map(s=>{const col=s.sc>=.85?'var(--mint)':s.sc>=.70?'var(--gold)':'var(--red)';const tr=s.trend?(s.trend.startsWith('+')?'↑':s.trend.startsWith('-')?'↓':'→'):'';return `<div class="source-card ${s.cls}"><div class="sc-hdr"><span class="sc-icon">${s.ic}</span><span class="sc-name">${s.n}</span></div><div class="sc-score-row"><div class="sc-bar"><div class="sc-fill" style="width:${s.sc*100}%;background:${col}"></div></div><div class="sc-num" style="color:${col}">${Math.round(s.sc*100)}</div></div><div><span class="sc-status ${s.st}">${s.st.toUpperCase()}</span> <span style="font-size:9px;color:var(--dgray)">${tr} ${s.trend||''}</span></div><div class="sc-finding">${s.find}</div><div class="sc-update">⏱ ${s.upd} · weight ${Math.round(s.wt*100)}%</div></div>`;}).join('');
+  document.getElementById('fusion-summary-tbody').innerHTML=d.sources.map(s=>`<tr><td><span>${s.ic}</span> <strong>${s.n.split(' ')[0]}</strong></td><td style="font-size:10px">${s.find.split('.')[0]}</td><td style="color:${s.sc>=.85?'var(--mint)':s.sc>=.70?'var(--gold)':'var(--red)'}">${Math.round(s.sc*100)}%</td><td><span class="badge ${s.st==='live'?'badge-active':s.st==='stale'?'badge-locked':'badge-pending'}">${Math.round(s.wt*100)}%</span></td><td><span class="badge ${s.st==='live'?'badge-released':'badge-pending'}">${s.st}</span></td></tr>`).join('')+`<tr style="background:var(--bg3)"><td colspan="4"><strong>COMBINED FUSION SCORE</strong></td><td><strong style="color:var(--mint);font-size:15px">${d.score}/100 · ${d.conf}</strong></td></tr>`;
+}
+function renderFusionFreshness(){document.getElementById('fusion-freshness').innerHTML=[['🛰️ Satellite','3h ago',92,'var(--sat-color)'],['📍 GPS','Live · 30s',100,'var(--gps-color)'],['🌡️ IoT Env','2 min',98,'var(--iot-color)'],['📳 IoT Struct','5 min',96,'var(--iot-color)'],['🚁 Drone','4 days',42,'var(--drone-color)'],['📷 Cameras','3 offline',68,'var(--cam-color)'],['🖥️ Edge AI','30s',99,'var(--edge-color)'],['🎙️ Acoustic','8 min',94,'var(--acou-color)'],['👷 Physical','12 days',18,'var(--phys-color)']].map(([s,a,f,c])=>`<div class="kv-row" style="margin-bottom:5px"><span style="font-size:10px;color:var(--white)">${s}</span><div style="display:flex;align-items:center;gap:6px"><div style="width:70px;height:4px;background:var(--bg4);border-radius:2px;overflow:hidden"><div style="width:${f}%;height:100%;background:${c}"></div></div><span style="font-size:9px;color:var(--dgray);min-width:60px;text-align:right">${a}</span></div></div>`).join('');}
+function renderFusionDisagreements(){document.getElementById('fusion-disagreements').innerHTML=[{s:'Satellite vs Drone',i:'Progress: 78% vs 82% — 4% gap',n:'Drone 4 days older. Satellite more recent.',lv:'info'},{s:'IoT vs Satellite',i:'Night activity: 3 vehicles (IoT) vs 2 (SAR)',n:'Camera offline gap explains delta.',lv:'info'},{s:'GPS vs IoT',i:'88 active (GPS) but PM10 spike suggests more',n:'3 GPS trackers may be offline.',lv:'warn'}].map(d=>`<div class="alert-item ${d.lv}" style="margin-bottom:4px"><div class="ai-icon">${d.lv==='warn'?'⚠️':'ℹ️'}</div><div><div class="a-title">${d.s}</div><div class="a-detail">${d.i}</div><div style="font-size:9px;color:var(--teal)">${d.n}</div></div></div>`).join('');}
+function renderFusionCerts(){document.getElementById('fusion-certs').innerHTML=CERTS.slice(0,3).map(c=>`<div class="cert-row"><span style="font-size:18px">🔗</span><div style="flex:1"><div class="cert-id">${c.id}</div><div class="cert-name">${c.park} · ${c.type}</div><div class="cert-hash">${c.hash}</div></div><span class="badge badge-released">Verified</span></div>`).join('');}
+let _fusionTL=null;
+function renderFusionTimeline(){const c=document.getElementById('fusion-timeline');if(!c)return;if(_fusionTL)_fusionTL.destroy();_fusionTL=new Chart(c,{type:'line',data:{labels:['Mon','Tue','Wed','Thu','Fri','Sat','Now'],datasets:[{label:'Satellite',data:[88,88,90,92,91,92,92],borderColor:'#00D68F',tension:.4,pointRadius:1,fill:false},{label:'GPS',data:[94,95,95,96,95,95,95],borderColor:'#F6891F',tension:.4,pointRadius:1,fill:false},{label:'Drone',data:[93,93,93,93,93,93,93],borderColor:'#E53E3E',tension:.4,pointRadius:1,borderDash:[4,4],fill:false},{label:'Cameras',data:[84,84,82,61,61,61,61],borderColor:'#06B6D4',tension:.4,pointRadius:1,fill:false},{label:'IoT',data:[86,84,84,84,82,84,84],borderColor:'#38BDF8',tension:.4,pointRadius:1,fill:false}]},options:{responsive:true,interaction:{mode:'index',intersect:false},plugins:{legend:{labels:{color:'#5A7A94',font:{size:8},boxWidth:10}}},scales:{y:{min:50,max:100,ticks:{color:'#5A7A94',font:{size:8}},grid:{color:'#112240'}},x:{ticks:{color:'#5A7A94',font:{size:8}},grid:{display:false}}}}});}
+
+// ═══════════════════════════════════════════
+// DFI PORTAL
+// ═══════════════════════════════════════════
+const DFI_ROWS=[{n:'Dholera SIR',t:'indpark',f:'ADB',l:1200,d:840,p:79,ai:84,s:'on-track'},{n:'Bhadla Solar',t:'solar',f:'NTPC/IFC',l:420,d:380,p:88,ai:84,s:'on-track'},{n:'Delhi-Meerut RRTS',t:'railway',f:'AIIB/ADB',l:1120,d:940,p:84,ai:86,s:'on-track'},{n:'MAHSR Bullet Train',t:'railway',f:'JICA',l:15800,d:4200,p:41,ai:62,s:'at-risk'},{n:'Krishnapatnam NITI',t:'indpark',f:'ADB',l:920,d:610,p:61,ai:54,s:'at-risk'},{n:'IKN Nusantara',t:'indpark',f:'WB/ADB',l:1200,d:480,p:41,ai:62,s:'blocked'},{n:'AngloGold Ghana',t:'mining',f:'IFC/AfDB',l:640,d:520,p:88,ai:81,s:'on-track'},{n:'Kutch Wind Park',t:'wind',f:'ADB/GCF',l:280,d:180,p:74,ai:76,s:'on-track'},{n:'Nairobi Highway',t:'road',f:'AfDB/WB',l:620,d:610,p:78,ai:84,s:'on-track'}];
+const TRANCHES=[{p:'Dholera SIR',n:4,a:200,c:'Roads ≥80% + Power ≥60%',r:80,ac:79,e:'Sentinel-2 19 Mar',s:'pending'},{p:'MAHSR',n:3,a:1200,c:'Viaduct ≥40% + 150km cleared',r:40,ac:34,e:'Sentinel-2 20 Mar',s:'locked'},{p:'Bhadla Solar',n:3,a:140,c:'≥85% panels + grid connect',r:85,ac:88,e:'Planet+ECOSTRESS',s:'released'},{p:'Nairobi Hwy',n:5,a:80,c:'Final 20km paved',r:100,ac:92,e:'Sentinel-2 18 Mar',s:'locked'},{p:'Krishnapatnam',n:3,a:120,c:'MoEF Stage II active',r:100,ac:0,e:'MoEF records',s:'blocked'},{p:'AngloGold',n:4,a:120,c:'EIA + dust <100µg/m³',r:100,ac:98,e:'Sentinel+IoT',s:'pending'}];
+function initDFI(){
+  document.getElementById('dfi-tbody').innerHTML=DFI_ROWS.map(r=>{const col=PTCOLS[r.t];const sc=r.s==='on-track'?'badge-released':r.s==='at-risk'?'badge-pending':'badge-blocked';return `<tr><td><strong>${PTICONS[r.t]} ${r.n}</strong></td><td><span class="badge-type" style="background:${col}22;color:${col}">${r.t}</span></td><td>${r.f}</td><td>$${r.l}M</td><td>$${r.d}M <span style="color:var(--dgray);font-size:9px">(${Math.round(r.d/r.l*100)}%)</span></td><td><div style="display:flex;align-items:center;gap:4px"><div class="pbar" style="width:50px"><div class="pfill" style="width:${r.p}%;background:${r.p>=75?'var(--mint)':r.p>=50?'var(--gold)':'var(--red)'}"></div></div>${r.p}%</div></td><td style="color:${r.ai>=80?'var(--mint)':r.ai>=60?'var(--gold)':'var(--red)'};font-weight:700">${r.ai}</td><td><span class="badge ${sc}">${r.s}</span></td></tr>`;}).join('');
+  document.getElementById('tranche-tbody').innerHTML=TRANCHES.map(t=>{const sc=t.s==='released'?'badge-released':t.s==='pending'?'badge-pending':t.s==='blocked'?'badge-blocked':'badge-locked';const gap=t.s!=='released'?t.r-t.ac:0;return `<tr><td>${t.p}</td><td>T${t.n}</td><td>$${t.a}M</td><td style="font-size:9px">${t.c}</td><td>${t.r}%</td><td style="color:${t.ac>=t.r?'var(--mint)':'var(--gold)'}">${t.ac}%${gap>0?` <span style="font-size:8px;color:var(--red)">(${gap}% gap)</span>`:''}</td><td style="font-size:9px;color:var(--teal)">${t.e}</td><td><span class="badge ${sc}">${t.s}</span></td></tr>`;}).join('');
+  document.getElementById('dfi-certs').innerHTML=CERTS.map(c=>`<div class="cert-row"><span style="font-size:16px">🔗</span><div style="flex:1"><div class="cert-id">${c.id}</div><div class="cert-name">${c.park} · ${c.type}</div></div><span class="badge badge-released">✓</span></div>`).join('');
+  document.getElementById('dfi-alerts').innerHTML=ALERTS_DATA.filter(a=>a.lv!=='info').slice(0,3).map(alertHTML).join('');
+  const c=document.getElementById('dfi-chart');new Chart(c,{type:'doughnut',data:{labels:['Industrial','Solar','Mining','Railway','Port','Wind'],datasets:[{data:[42,18,14,12,8,6],backgroundColor:['#00B4CC','#F59E0B','#B45309','#22C55E','#06B6D4','#38BDF8'],borderWidth:0}]},options:{responsive:true,plugins:{legend:{position:'right',labels:{color:'#5A7A94',font:{size:9},boxWidth:10}}}}});
+}
+
+// ═══════════════════════════════════════════
+// FIELD PORTAL
+// ═══════════════════════════════════════════
+function initField(){
+  ['air','water','struct'].forEach(cat=>{document.getElementById('iot-'+cat).innerHTML=IOT_SENSORS[cat].map(s=>`<div class="sensor-row"><div class="sensor-icon">${s.ic}</div><div class="sensor-info"><div class="sensor-name">${s.n}</div><div class="sensor-val ${s.st==='crit'?'sensor-alert':''}">${s.v}</div><div class="sensor-status">${s.st==='crit'?'⚠ ALERT':s.st==='warn'?'⚠ Monitor':'✓ Normal'} · limit ${s.lim} · ${s.site}</div></div></div>`).join('');});
+  document.getElementById('edge-grid').innerHTML=EDGE_DEVS.map(d=>`<div class="edge-card"><div style="display:flex;align-items:center;gap:8px;margin-bottom:7px"><div class="edge-led ${d.st==='processing'?'proc':d.st==='online'?'on':'off'}"></div><div><div style="font-size:11px;font-weight:700;color:var(--white)">${d.n}</div><div style="font-size:9px;color:var(--dgray)">${d.loc}</div></div></div><div style="font-size:10px;color:var(--purple);margin-bottom:5px">🧠 ${d.type}</div><div style="display:flex;align-items:center;gap:5px;margin:4px 0"><span style="font-size:9px;color:var(--dgray);min-width:25px">CPU</span><div class="pbar"><div class="pfill" style="width:${d.cpu}%;background:${d.cpu>85?'var(--red)':d.cpu>70?'var(--gold)':'var(--mint)'}"></div></div><span style="font-size:9px;color:var(--white)">${d.cpu}%</span></div><div style="display:flex;justify-content:space-between;margin-top:7px"><div style="text-align:center"><div style="font-size:13px;font-weight:700;color:var(--white)">${d.ev.toLocaleString()}</div><div style="font-size:8px;color:var(--dgray)">Events</div></div><div style="text-align:center"><div style="font-size:11px;font-weight:700;color:var(--teal)">${d.up}d</div><div style="font-size:8px;color:var(--dgray)">Uptime</div></div><div style="text-align:center"><div style="font-size:9px;color:var(--dgray);margin-top:3px">${d.model}</div></div></div></div>`).join('');
+  document.getElementById('edge-sec-log').innerHTML=[{t:'09:41',m:'Gate 1 — Authorized vehicle KA05AB1234',lv:'info'},{t:'08:47',m:'Zone B — Intrusion attempt detected. Alert sent.',lv:'crit'},{t:'08:22',m:'PPE violation — worker without helmet Zone C',lv:'warn'},{t:'07:14',m:'Gate 3 — Unknown vehicle exit pre-dawn',lv:'crit'}].map(e=>`<div class="alert-item ${e.lv}" style="margin-bottom:4px"><div class="ai-icon">${e.lv==='crit'?'🔴':e.lv==='warn'?'⚠️':'ℹ️'}</div><div><div class="a-time">${e.t}</div><div style="font-size:11px;color:var(--text)">${e.m}</div></div></div>`).join('');
+  document.getElementById('drone-list').innerHTML=DRONES.map(m=>`<div class="drone-row"><span style="font-size:20px">🚁</span><div style="flex:1"><div style="font-size:11px;font-weight:600;color:var(--white)">${m.id} — ${m.park}</div><div style="font-size:9px;color:var(--dgray)">${m.type} · ${m.date} · ${m.drone} · ${m.gsd}</div><div style="font-size:9px;color:${m.st==='processed'?'var(--mint)':'var(--gold)'};margin-top:2px">${m.find}</div></div><div style="font-size:10px;font-weight:600;color:${m.st==='processed'?'var(--mint)':'var(--gold)'}">${m.st.toUpperCase()}</div></div>`).join('');
+  document.getElementById('drone-stockpile').innerHTML=[{m:'Precast slab — Zone A',c:'0',col:'var(--dgray)',n:'1,248 units. No change.'},{m:'Steel rebar — Zone D',c:'-2.1 MT',col:'var(--red)',n:'⚠ Correlated with truck exit 23:51'},{m:'Aggregate — Zone B',c:'+18.4 MT',col:'var(--mint)',n:'New delivery. Manifest matches.'},{m:'Iron ore — Odisha',c:'+28,500 T',col:'var(--mint)',n:'Daily extraction confirmed.'}].map(s=>`<div style="display:flex;justify-content:space-between;padding:7px;background:var(--bg3);border-radius:5px;margin-bottom:4px"><div><div style="font-size:11px;color:var(--white)">${s.m}</div><div style="font-size:9px;color:var(--dgray)">${s.n}</div></div><div style="font-size:12px;font-weight:700;color:${s.col}">${s.c}</div></div>`).join('');
+  document.getElementById('cam-grid').innerHTML=CAMERAS.map(c=>`<div class="edge-card" style="${c.st==='offline'?'border-left:3px solid var(--red)':''}"><div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><div style="width:8px;height:8px;border-radius:50%;background:${c.st==='live'?'var(--mint)':'#2a3a4a'}"></div><div style="font-size:11px;font-weight:700;color:var(--white)">${c.n}</div></div><div style="background:var(--bg3);border-radius:5px;height:70px;display:flex;align-items:center;justify-content:center;margin-bottom:7px">${c.st==='live'?'<div style="text-align:center"><div style="font-size:18px">📹</div><div style="font-size:8px;color:var(--mint)">● LIVE</div></div>':'<div style="text-align:center"><div style="font-size:18px">❌</div><div style="font-size:8px;color:var(--red)">OFFLINE</div></div>'}</div><div style="font-size:9px;color:var(--dgray)">${c.loc}</div><div style="font-size:9px;color:var(--purple)">AI: ${c.ai} · ${c.ev} events</div></div>`).join('');
+  document.getElementById('acou-blast').innerHTML=[{t:'09:38',s:'Odisha Mine Zone 7',db:142,n:'Scheduled blast. Workers evacuated.'},{t:'Yest 14:22',s:'Odisha Mine Zone 6',db:138,n:'Routine extraction blast.'}].map(b=>`<div class="sensor-row"><div class="sensor-icon">💥</div><div class="sensor-info"><div class="sensor-name">${b.s}</div><div class="sensor-val">${b.db} dB</div><div class="sensor-status">${b.t} · ${b.n}</div></div></div>`).join('');
+  document.getElementById('acou-night').innerHTML=[{t:'01:22',s:'Krishnapatnam buffer',db:64,alert:true,n:'🔴 Unidentified vehicle during camera blackout'},{t:'03:11',s:'Dholera Gate 3',db:72,alert:false,n:'Scheduled cement convoy'}].map(n=>`<div class="sensor-row" style="${n.alert?'background:rgba(229,62,62,.08)':''}"><div class="sensor-icon">${n.alert?'🔴':'🌙'}</div><div class="sensor-info"><div class="sensor-name">${n.s}</div><div class="sensor-val">${n.db} dB</div><div class="sensor-status">${n.t} · ${n.n}</div></div></div>`).join('');
+  setTimeout(()=>{initFieldCharts();},100);
+}
+function switchFieldTab(tab,el){document.querySelectorAll('.field-tab').forEach(t=>t.style.display='none');document.querySelectorAll('#portal-field .inner-tab').forEach(b=>b.classList.remove('active'));document.getElementById('field-'+tab).style.display='block';el.classList.add('active');if(tab==='edge'&&!window._edgeChInit){setTimeout(initEdgeChart,100);window._edgeChInit=true;}if(tab==='acoustic'&&!window._acChInit){setTimeout(initAcouChart,100);window._acChInit=true;}}
+function initFieldCharts(){
+  const t=document.getElementById('turb-chart');if(t)new Chart(t,{type:'line',data:{labels:['06','08','10','12','14','16','18','Now'],datasets:[{label:'Turbidity NTU',data:[28,32,38,44,82,124,220,340],borderColor:'#F6891F',backgroundColor:'rgba(246,137,31,.1)',tension:.4,fill:true,pointRadius:2}]},options:{responsive:true,plugins:{legend:{labels:{color:'#5A7A94',font:{size:9}}}},scales:{y:{ticks:{color:'#5A7A94',font:{size:8}},grid:{color:'#112240'}},x:{ticks:{color:'#5A7A94',font:{size:8}},grid:{display:false}}}}});
+  const p=document.getElementById('pm25-chart');if(p)new Chart(p,{type:'line',data:{labels:['06','08','10','12','14','16','18','Now'],datasets:[{label:'PM2.5 µg/m³',data:[48,56,68,82,92,88,84,82],borderColor:'#38BDF8',backgroundColor:'rgba(56,189,248,.1)',tension:.4,fill:true,pointRadius:2}]},options:{responsive:true,plugins:{legend:{labels:{color:'#5A7A94',font:{size:9}}}},scales:{y:{ticks:{color:'#5A7A94',font:{size:8}},grid:{color:'#112240'}},x:{ticks:{color:'#5A7A94',font:{size:8}},grid:{display:false}}}}});
+}
+function initEdgeChart(){const c=document.getElementById('edge-chart');if(!c||c._done)return;c._done=1;new Chart(c,{type:'bar',data:{labels:['06','08','10','12','14','16','18','Now'],datasets:[{label:'Vehicle',data:[42,128,184,210,198,176,168,147],backgroundColor:'#F6891F',borderRadius:2},{label:'PPE',data:[18,64,92,108,96,84,78,68],backgroundColor:'#8B5CF6',borderRadius:2},{label:'Intrusion',data:[2,1,0,1,0,2,4,1],backgroundColor:'#E53E3E',borderRadius:2}]},options:{responsive:true,plugins:{legend:{labels:{color:'#5A7A94',font:{size:9},boxWidth:10}}},scales:{x:{stacked:true,ticks:{color:'#5A7A94',font:{size:8}},grid:{display:false}},y:{stacked:true,ticks:{color:'#5A7A94'},grid:{color:'#112240'}}}}});}
+function initAcouChart(){const c=document.getElementById('acou-chart');if(!c||c._done)return;c._done=1;new Chart(c,{type:'bar',data:{labels:['06','08','10','12','14','16','18','Now'],datasets:[{label:'Activity dB',data:[48,78,84,86,82,84,80,83],backgroundColor:'rgba(167,139,250,.6)',borderRadius:2}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{min:40,ticks:{color:'#5A7A94',font:{size:8}},grid:{color:'#112240'}},x:{ticks:{color:'#5A7A94',font:{size:8}},grid:{display:false}}}}});}
+
+// ═══════════════════════════════════════════
+// INVESTOR PORTAL
+// ═══════════════════════════════════════════
+function initInv(){
+  new Chart(document.getElementById('inv-type-chart'),{type:'doughnut',data:{labels:['Industrial','Solar','Mining','Railway','Port','Wind','Dam'],datasets:[{data:[35,22,16,12,8,4,3],backgroundColor:['#00B4CC','#F59E0B','#B45309','#22C55E','#06B6D4','#38BDF8','#3B82F6'],borderWidth:0}]},options:{responsive:true,plugins:{legend:{position:'right',labels:{color:'#5A7A94',font:{size:9},boxWidth:10}}}}});
+  new Chart(document.getElementById('inv-country-chart'),{type:'bar',data:{labels:['India','Indonesia','Kenya','Ghana','Ethiopia','Bangladesh'],datasets:[{data:[68,14,6,5,4,3],backgroundColor:'#00B4CC',borderRadius:3}]},options:{responsive:true,indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#5A7A94',font:{size:8}},grid:{color:'#112240'}},y:{ticks:{color:'#5A7A94',font:{size:9}},grid:{display:false}}}}});
+  document.getElementById('inv-tbody').innerHTML=ALL_PROJECTS.slice(0,9).map(p=>{const sc=p.ai>=80?'var(--mint)':p.ai>=60?'var(--gold)':'var(--red)';const irr=(8+p.ai/20).toFixed(1);return `<tr><td>${PTICONS[p.t]} ${p.n}</td><td><span class="badge-type" style="background:${PTCOLS[p.t]}22;color:${PTCOLS[p.t]}">${p.t}</span></td><td>${p.c}</td><td>$${(p.inv/1000).toFixed(0)}B</td><td>${p.prog}%</td><td style="color:${sc};font-weight:700">${p.ai}</td><td style="color:var(--purple)">${Math.round((p.fs||.8)*100)}%</td><td style="color:var(--mint)">${irr}%</td><td><span class="badge ${p.ai>=80?'badge-released':p.ai>=60?'badge-pending':'badge-blocked'}">${p.ai>=80?'LOW':p.ai>=60?'MOD':'HIGH'}</span></td></tr>`;}).join('');
+}
+
+// ═══════════════════════════════════════════
+// INSURANCE PORTAL
+// ═══════════════════════════════════════════
+function initIns(){
+  new Chart(document.getElementById('ins-radar'),{type:'radar',data:{labels:['Industrial','Solar','Wind','Mining','Railway','Dam','Port'],datasets:[{label:'Risk Score',data:[38,24,18,68,42,82,54],borderColor:'#E53E3E',backgroundColor:'rgba(229,62,62,.15)',pointBackgroundColor:'#E53E3E'}]},options:{responsive:true,scales:{r:{ticks:{color:'#5A7A94',font:{size:8},backdropColor:'transparent'},grid:{color:'#112240'},angleLines:{color:'#112240'},pointLabels:{color:'#5A7A94',font:{size:9}}}},plugins:{legend:{labels:{color:'#5A7A94'}}}}});
+  document.getElementById('ins-tbody').innerHTML=ALL_PROJECTS.filter(p=>p.alert||p.ai<75).slice(0,6).map(p=>`<tr><td>${PTICONS[p.t]} ${p.n}</td><td>${p.t}</td><td><span class="badge ${p.ai>=75?'badge-released':p.ai>=55?'badge-pending':'badge-blocked'}">${p.ai>=75?'LOW':p.ai>=55?'MOD':'HIGH'}</span></td><td>${p.t==='dam'?'1.8mm':p.t==='mining'?'-3.8mm':'N/A'}</td><td style="color:${p.ai>=80?'var(--mint)':p.ai>=60?'var(--gold)':'var(--red)'}">${p.ai}</td><td><button class="btn" style="font-size:9px;padding:2px 8px">Review</button></td></tr>`).join('');
+  document.getElementById('ins-claims').innerHTML=[{id:'CLM-2026-041',p:'Krishnapatnam',i:'CRZ violation damage',s:'investigating',a:'$4.2M'},{id:'CLM-2026-039',p:'Odisha Mine',i:'Haul road collapse',s:'verified',a:'$1.8M'},{id:'CLM-2026-037',p:'Dholera',i:'Material theft — sat+GPS evidence',s:'open',a:'$0.3M'}].map(c=>`<div style="padding:8px;background:var(--bg3);border-radius:6px;margin-bottom:5px"><div style="display:flex;justify-content:space-between"><span style="font-size:11px;font-weight:700;color:var(--white)">${c.id}</span><span style="font-size:11px;font-weight:700;color:var(--gold)">${c.a}</span></div><div style="font-size:10px;color:var(--text)">${c.p} — ${c.i}</div><span class="badge ${c.s==='verified'?'badge-released':c.s==='open'?'badge-pending':'badge-locked'}" style="margin-top:3px">${c.s.toUpperCase()}</span></div>`).join('');
+}
+
+// Boot — show login first
+document.addEventListener('DOMContentLoaded',()=>{/* login screen is default visible */});
+</script>
+</body>
+</html>
